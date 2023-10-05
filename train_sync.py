@@ -5,6 +5,7 @@ import wandb
 from torch.utils.data import DataLoader
 
 from data import load_dataset, preprocess
+from model import BaseModel
 from setup_utils import load_train_yaml, set_seed
 
 def main(args):
@@ -47,6 +48,8 @@ def main(args):
                              shuffle=True, num_workers=4)
     val_data_loader = DataLoader(edge_index, batch_size=train_config["val_batch_size"],
                                  shuffle=False)
+
+    # model =
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
