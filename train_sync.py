@@ -3,7 +3,7 @@ import torch
 import wandb
 
 from data import load_dataset, preprocess
-from setup_utils import load_train_yaml
+from setup_utils import load_train_yaml, set_seed
 
 def main(args):
     model_name = "Sync"
@@ -35,6 +35,9 @@ def main(args):
     dst, src = torch.triu_indices(N, N, offset=1, device=device)
     # (|E|, 2), |E| for number of edges
     edge_index = torch.stack([dst, src], dim=1)
+
+    # Set seed for better reproducibility.
+    set_seed()
 
 if __name__ == '__main__':
     from argparse import ArgumentParser

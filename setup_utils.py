@@ -1,4 +1,8 @@
+import dgl
+import numpy as np
 import pydantic
+import random
+import torch
 import yaml
 
 from typing import Optional
@@ -59,3 +63,13 @@ def load_train_yaml(data_name, model_name):
 
     if model_name == "Sync":
         return SyncYaml(**yaml_data).model_dump()
+
+def set_seed(seed=0):
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    dgl.seed(seed)
