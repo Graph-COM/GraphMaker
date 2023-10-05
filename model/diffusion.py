@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+__all__ = ["ModelSync"]
+
 class MarginalTransition(nn.Module):
     """
     Parameters
@@ -122,3 +124,36 @@ class BaseModel(nn.Module):
         self.E_marginal = E_marginal
 
         self.loss_E = LossE()
+
+class ModelSync(BaseModel):
+    """
+    Parameters
+    ----------
+    T : int
+        Number of diffusion time steps.
+    X_marginal : torch.Tensor of shape (F, 2)
+        X_marginal[f, :] is the marginal distribution of the f-th node attribute.
+    Y_marginal : torch.Tensor of shape (C)
+        Marginal distribution of the node labels.
+    E_marginal : torch.Tensor of shape (2)
+        Marginal distribution of the edge existence.
+    gnn_X_config : dict
+        Configuration of the GNN for reconstructing node attributes.
+    gnn_E_config : dict
+        Configuration of the GNN for reconstructing edges.
+    num_nodes : int
+        Number of nodes in the original graph.
+    """
+    def __init__(self,
+                 T,
+                 X_marginal,
+                 Y_marginal,
+                 E_marginal,
+                 gnn_X_config,
+                 gnn_E_config,
+                 num_nodes):
+        super().__init__(T=T,
+                         X_marginal=X_marginal,
+                         Y_marginal=Y_marginal,
+                         E_marginal=E_marginal,
+                         num_nodes=num_nodes)
