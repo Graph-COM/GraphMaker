@@ -5,7 +5,6 @@ import wandb
 from torch.utils.data import DataLoader
 
 from data import load_dataset, preprocess
-from model import BaseModel
 from setup_utils import load_train_yaml, set_seed
 
 def main(args):
