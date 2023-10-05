@@ -6,6 +6,8 @@
 
 - [Installation](#installation)
 - [Frequently Asked Questions](#frequently-asked-questions)
+  * [Q1: libcusparse.so](#q1-libcusparseso)
+  * [Q2: Other requests](#q2-other-requests)
 
 ## Installation
 
@@ -27,6 +29,8 @@ g++ -O2 -std=c++11 -o orca orca.cpp
 
 ## Frequently Asked Questions
 
+### Q1: libcusparse.so
+
 **An error occurs that the program cannot find `libcusparse.so`.**
 
 To search for the location of it on linux,
@@ -40,6 +44,8 @@ where `/path/to/directory` is the directory you want to search. Assume that the 
 ```bash
 export LD_LIBRARY_PATH=home/miniconda3/envs/GraphMaker/lib:$LD_LIBRARY_PATH
 ```
+
+### Q2: Other requests
 
 **I have a question not listed here.**
 
