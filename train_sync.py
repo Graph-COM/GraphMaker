@@ -48,8 +48,6 @@ def main(args):
     val_data_loader = DataLoader(edge_index, batch_size=train_config["val_batch_size"],
                                  shuffle=False)
 
-    # model =
-
 if __name__ == '__main__':
     from argparse import ArgumentParser
 
