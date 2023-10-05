@@ -38,13 +38,22 @@ g++ -O2 -std=c++11 -o orca orca.cpp
 
 `GraphMaker-Sync` simultaneously generates node attributes and graph structure.
 
+```bash
+```
+
 ### GraphMaker-Async
 
 `GraphMaker-Async` first generates node attributes and then graph structure.
 
+```bash
+```
+
 ### GraphMaker-E
 
-`GraphMaker-E` generates graph structure conditioned on node attributes sampled from empirical distributions.   
+`GraphMaker-E` generates graph structure conditioned on node attributes sampled from empirical distributions.
+
+```bash
+```
 
 ## Frequently Asked Questions
 
