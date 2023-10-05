@@ -1,5 +1,5 @@
 meta_data :
-  model_name: "Sync" # Model name.
+  variant: "Sync" # Model name.
 
 gnn_X : # GNN for reconstructing node attributes.
   hidden_t: 16 # Hidden size for the normalized time step.
