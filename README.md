@@ -27,7 +27,7 @@ g++ -O2 -std=c++11 -o orca orca.cpp
 
 ## Frequently Asked Questions
 
-1. An error occurs that the program cannot find `libcusparse.so`.
+**An error occurs that the program cannot find `libcusparse.so`.**
 
 To search for the location of it on linux,
 
@@ -41,7 +41,7 @@ where `/path/to/directory` is the directory you want to search. Assume that the 
 export LD_LIBRARY_PATH=home/miniconda3/envs/GraphMaker/lib:$LD_LIBRARY_PATH
 ```
 
-2. I have a question not listed here.
+**I have a question not listed here.**
 
 - It's generally recommended to open a GitHub issue. This allows us to track the progress, and the discussion might help others who have the same question.
 - Otherwise, you can also send an email to `mufeili1996@gmail.com`.
