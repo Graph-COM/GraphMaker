@@ -2,7 +2,7 @@ import pandas as pd
 import torch
 import wandb
 
-from data import load_dataset
+from data import load_dataset, preprocess
 from setup_utils import load_train_yaml
 
 def main(args):
@@ -20,6 +20,21 @@ def main(args):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     g = load_dataset(args.dataset)
+    X_one_hot_3d, Y, E_one_hot,\
+        X_marginal, Y_marginal, E_marginal, X_cond_Y_marginals = preprocess(g)
+
+    X_one_hot_3d = X_one_hot_3d.to(device)
+    Y = Y.to(device)
+    E_one_hot = E_one_hot.to(device)
+
+    X_marginal = X_marginal.to(device)
+    Y_marginal = Y_marginal.to(device)
+    E_marginal = E_marginal.to(device)
+
+    N = g.num_nodes()
+    dst, src = torch.triu_indices(N, N, offset=1, device=device)
+    # (|E|, 2), |E| for number of edges
+    edge_index = torch.stack([dst, src], dim=1)
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
