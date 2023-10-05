@@ -6,9 +6,8 @@
 
 - [Installation](#installation)
 - [Usage](#usage)
-  * [GraphMaker-Sync](#graphmaker-sync)
-  * [GraphMaker-Async](#graphmaker-async)
-  * [GraphMaker-E](#graphmaker-e)
+  * [Train](#train)
+  * [Sample](#sample)
 - [Frequently Asked Questions](#frequently-asked-questions)
   * [Q1: libcusparse.so](#q1-libcusparseso)
   * [Q2: Wandb](#q2-wandb)
@@ -34,23 +33,20 @@ g++ -O2 -std=c++11 -o orca orca.cpp
 
 ## Usage
 
-### GraphMaker-Sync
-
-`GraphMaker-Sync` simultaneously generates node attributes and graph structure.
+### Train
 
 ```bash
+# GraphMaker-Sync simultaneously generates node attributes and graph structure.
+python train_sync.py -d D
+
+# GraphMaker-Async first generates node attributes and then graph structure.
+
+# GraphMaker-E generates graph structure conditioned on node attributes sampled from empirical distributions P(Y)\prod P(X_f | Y).
 ```
 
-### GraphMaker-Async
+`D` can be one of the four built-in datasets, including `cora`, `citeseer`, `amazon_photo`, `amazon_computer`.
 
-`GraphMaker-Async` first generates node attributes and then graph structure.
-
-```bash
-```
-
-### GraphMaker-E
-
-`GraphMaker-E` generates graph structure conditioned on node attributes sampled from empirical distributions.
+### Sample
 
 ```bash
 ```
