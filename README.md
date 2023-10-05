@@ -5,9 +5,11 @@
 ## Table of Contents
 
 - [Installation](#installation)
+- [Usage](#usage)
 - [Frequently Asked Questions](#frequently-asked-questions)
   * [Q1: libcusparse.so](#q1-libcusparseso)
-  * [Q2: Other requests](#q2-other-requests)
+  * [Q2: Wandb](#q2-wandb)
+  * [Q3: Other Requests](#q3-other-requests)
 
 ## Installation
 
@@ -27,6 +29,8 @@ cd orca
 g++ -O2 -std=c++11 -o orca orca.cpp
 ```
 
+## Usage
+
 ## Frequently Asked Questions
 
 ### Q1: libcusparse.so
@@ -45,9 +49,15 @@ where `/path/to/directory` is the directory you want to search. Assume that the 
 export LD_LIBRARY_PATH=home/miniconda3/envs/GraphMaker/lib:$LD_LIBRARY_PATH
 ```
 
-### Q2: Other requests
+### Q2: Wandb
 
-**I have a question not listed here.**
+**What is WandB?**
+
+[WandB](https://wandb.ai/site) is a tool for visualizing and tracking your machine learning experiments. It's free to use for open source projects. You may also use our code without it.
+
+### Q3: Other Requests
+
+**I have a question or request not listed here.**
 
 - It's generally recommended to open a GitHub issue. This allows us to track the progress, and the discussion might help others who have the same question.
 - Otherwise, you can also send an email to `mufeili1996@gmail.com`.
