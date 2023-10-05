@@ -6,6 +6,9 @@
 
 - [Installation](#installation)
 - [Usage](#usage)
+  * [GraphMaker-Sync](#graphmaker-sync)
+  * [GraphMaker-Async](#graphmaker-async)
+  * [GraphMaker-E](#graphmaker-e)
 - [Frequently Asked Questions](#frequently-asked-questions)
   * [Q1: libcusparse.so](#q1-libcusparseso)
   * [Q2: Wandb](#q2-wandb)
@@ -30,6 +33,18 @@ g++ -O2 -std=c++11 -o orca orca.cpp
 ```
 
 ## Usage
+
+### GraphMaker-Sync
+
+`GraphMaker-Sync` simultaneously generates node attributes and graph structure.
+
+### GraphMaker-Async
+
+`GraphMaker-Async` first generates node attributes and then graph structure.
+
+### GraphMaker-E
+
+`GraphMaker-E` generates graph structure conditioned on node attributes sampled from empirical distributions.   
 
 ## Frequently Asked Questions
 
