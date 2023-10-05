@@ -2,6 +2,8 @@ import pandas as pd
 import torch
 import wandb
 
+from torch.utils.data import DataLoader
+
 from data import load_dataset, preprocess
 from setup_utils import load_train_yaml, set_seed
 
@@ -38,6 +40,13 @@ def main(args):
 
     # Set seed for better reproducibility.
     set_seed()
+
+    train_config = yaml_data["train"]
+    # For mini-batch training
+    data_loader = DataLoader(edge_index.cpu(), batch_size=train_config["batch_size"],
+                             shuffle=True, num_workers=4)
+    val_data_loader = DataLoader(edge_index, batch_size=train_config["val_batch_size"],
+                                 shuffle=False)
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
