@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+__all__ = ["GNN", "LinkPredictor"]
+
 class GNNLayer(nn.Module):
     """Graph Neural Network (GNN) / Message Passing Neural Network (MPNN) Layer.
 

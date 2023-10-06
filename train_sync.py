@@ -2,6 +2,8 @@ import pandas as pd
 import torch
 import wandb
 
+from copy import deepcopy
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 
 from data import load_dataset, preprocess
@@ -56,6 +58,30 @@ def main(args):
                       gnn_X_config=yaml_data["gnn_X"],
                       gnn_E_config=yaml_data["gnn_E"],
                       **yaml_data["diffusion"]).to(device)
+
+    optimizer_X = torch.optim.AdamW(model.graph_encoder.pred_X.parameters(),
+                                    **yaml_data["optimizer_X"])
+    optimizer_E = torch.optim.AdamW(model.graph_encoder.pred_E.parameters(),
+                                    **yaml_data["optimizer_E"])
+
+    lr_scheduler_X = ReduceLROnPlateau(optimizer_X, mode='min', **yaml_data["lr_scheduler"])
+    lr_scheduler_E = ReduceLROnPlateau(optimizer_E, mode='min', **yaml_data["lr_scheduler"])
+
+    best_epoch_X = 0
+    best_state_dict_X = deepcopy(model.graph_encoder.pred_X.state_dict())
+    best_val_nll_X = float('inf')
+    best_log_p_0_X = float('inf')
+    best_denoise_match_X = float('inf')
+
+    best_epoch_E = 0
+    best_state_dict_E = deepcopy(model.graph_encoder.pred_E.state_dict())
+    best_val_nll_E = float('inf')
+    best_log_p_0_E = float('inf')
+    best_denoise_match_E = float('inf')
+
+    num_patient_epochs = 0
+    for epoch in range(train_config["num_epochs"]):
+        model.train()
 
 if __name__ == '__main__':
     from argparse import ArgumentParser

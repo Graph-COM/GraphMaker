@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from .gnn import *
+
 __all__ = ["ModelSync"]
 
 class MarginalTransition(nn.Module):
@@ -125,6 +127,23 @@ class BaseModel(nn.Module):
 
         self.loss_E = LossE()
 
+class LossX(nn.Module):
+    """
+    Parameters
+    ----------
+    num_attrs_X : int
+        Number of node attributes.
+    num_classes_X : int
+        Number of classes for each node attribute.
+    """
+    def __init__(self,
+                 num_attrs_X,
+                 num_classes_X):
+        super().__init__()
+
+        self.num_attrs_X = num_attrs_X
+        self.num_classes_X = num_classes_X
+
 class ModelSync(BaseModel):
     """
     Parameters
@@ -157,3 +176,12 @@ class ModelSync(BaseModel):
                          Y_marginal=Y_marginal,
                          E_marginal=E_marginal,
                          num_nodes=num_nodes)
+
+        self.graph_encoder = GNN(num_attrs_X=self.num_attrs_X,
+                                 num_classes_X=self.num_classes_X,
+                                 num_classes_Y=self.num_classes_Y,
+                                 num_classes_E=self.num_classes_E,
+                                 gnn_X_config=gnn_X_config,
+                                 gnn_E_config=gnn_E_config)
+
+        self.loss_X = LossX(self.num_attrs_X, self.num_classes_X)
