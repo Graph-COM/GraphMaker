@@ -185,3 +185,35 @@ class ModelSync(BaseModel):
                                  gnn_E_config=gnn_E_config)
 
         self.loss_X = LossX(self.num_attrs_X, self.num_classes_X)
+
+    def log_p_t(self,
+                X_one_hot_3d,
+                E_one_hot,
+                Y,
+                batch_src,
+                batch_dst,
+                batch_E_one_hot,
+                t=None):
+        """Obtain G^t from G^0 and compute log p(G^0 | G^t, Y, t).
+
+        Parameters
+        ----------
+        X_one_hot_3d : torch.Tensor of shape (F, |V|, 2)
+            X_one_hot_3d[f, :, :] is the one-hot encoding of the f-th node attribute.
+        E_one_hot : torch.Tensor of shape (|V|, |V|, 2)
+            - E_one_hot[:, :, 0] indicates the absence of an edge.
+            - E_one_hot[:, :, 1] is the original adjacency matrix.
+        Y : torch.Tensor of shape (|V|)
+            Categorical node labels.
+        batch_src : torch.LongTensor of shape (B)
+            Source node IDs for a batch of edges (node pairs).
+        batch_dst : torch.LongTensor of shape (B)
+            Destination node IDs for a batch of edges (node pairs).
+        batch_E_one_hot : torch.Tensor of shape (B, 2)
+            batch_E_one_hot[batch_dst, batch_src].
+        t : torch.LongTensor of shape (1), optional
+            If specified, a time step will be enforced rather than sampled.
+
+        Returns
+        -------
+        """

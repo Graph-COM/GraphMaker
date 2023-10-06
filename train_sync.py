@@ -5,6 +5,7 @@ import wandb
 from copy import deepcopy
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from data import load_dataset, preprocess
 from model import ModelSync
@@ -82,6 +83,17 @@ def main(args):
     num_patient_epochs = 0
     for epoch in range(train_config["num_epochs"]):
         model.train()
+
+        for batch_edge_index in tqdm(data_loader):
+            batch_edge_index = batch_edge_index.to(device)
+            # (B), (B)
+            batch_dst, batch_src = batch_edge_index.T
+            model.log_p_t(X_one_hot_3d,
+                          E_one_hot,
+                          Y,
+                          batch_src,
+                          batch_dst,
+                          E_one_hot[batch_dst, batch_src])
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
