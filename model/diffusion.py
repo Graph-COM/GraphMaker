@@ -1,3 +1,4 @@
+import dgl.sparse as dglsp
 import numpy as np
 import torch
 import torch.nn as nn
@@ -213,6 +214,25 @@ class BaseModel(nn.Module):
 
         return X_t_one_hot
 
+    def get_adj(self, E_t):
+        """
+        Parameters
+        ----------
+        E_t : torch.LongTensor of shape (|V|, |V|)
+            Sampled symmetric adjacency matrix.
+
+        Returns
+        -------
+        dglsp.SparseMatrix
+            Row-normalized adjacency matrix.
+        """
+        # Row normalization.
+        edges_t = E_t.nonzero().T
+        num_nodes = E_t.size(0)
+        A_t = dglsp.spmatrix(edges_t, shape=(num_nodes, num_nodes))
+        D_t = dglsp.diag(A_t.sum(1)) ** -1
+        return D_t @ A_t
+
 class LossX(nn.Module):
     """
     Parameters
@@ -355,3 +375,4 @@ class ModelSync(BaseModel):
         -------
         """
         t_float, X_t_one_hot, E_t = self.apply_noise(X_one_hot_3d, E_one_hot, t)
+        A_t = self.get_adj(E_t)
