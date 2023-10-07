@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from .gnn import *
 
@@ -43,6 +44,40 @@ class MarginalTransition(nn.Module):
 
         self.m_X = nn.Parameter(self.m_X, requires_grad=False)
         self.m_E = nn.Parameter(self.m_E, requires_grad=False)
+
+    def get_Q_bar_E(self, alpha_bar_t):
+        """Compute the probability transition matrices for obtaining A^t.
+
+        Parameters
+        ----------
+        alpha_bar_t : torch.Tensor of shape (1)
+            A value in [0, 1].
+
+        Returns
+        -------
+        Q_bar_t_E : torch.Tensor of shape (2, 2)
+            Transition matrix for corrupting graph structure at time step t.
+        """
+        Q_bar_t_E = alpha_bar_t * self.I_E + (1 - alpha_bar_t) * self.m_E
+
+        return Q_bar_t_E
+
+    def get_Q_bar_X(self, alpha_bar_t):
+        """Compute the probability transition matrices for obtaining X^t.
+
+        Parameters
+        ----------
+        alpha_bar_t : torch.Tensor of shape (1)
+            A value in [0, 1].
+
+        Returns
+        -------
+        Q_bar_t_X : torch.Tensor of shape (F, 2, 2)
+            Transition matrix for corrupting node attributes at time step t.
+        """
+        Q_bar_t_X = alpha_bar_t * self.I_X + (1 - alpha_bar_t) * self.m_X
+
+        return Q_bar_t_X
 
 class NoiseSchedule(nn.Module):
     """
@@ -87,7 +122,7 @@ class BaseModel(nn.Module):
     Parameters
     ----------
     T : int
-        Number of diffusion time steps.
+        Number of diffusion time steps - 1.
     X_marginal : torch.Tensor of shape (F, 2)
         X_marginal[f, :] is the marginal distribution of the f-th node attribute.
     Y_marginal : torch.Tensor of shape (C)
@@ -127,6 +162,57 @@ class BaseModel(nn.Module):
 
         self.loss_E = LossE()
 
+    def sample_E(self, prob_E):
+        """Sample a graph structure from prob_E.
+
+        Parameters
+        ----------
+        prob_E : torch.Tensor of shape (|V|, |V|, 2)
+            Probability distribution for edge existence.
+
+        Returns
+        -------
+        E_t : torch.LongTensor of shape (|V|, |V|)
+            Sampled symmetric adjacency matrix.
+        """
+        # (|V|^2, 1)
+        E_t = prob_E.reshape(-1, prob_E.size(-1)).multinomial(1)
+
+        # (|V|, |V|)
+        num_nodes = prob_E.size(0)
+        E_t = E_t.reshape(num_nodes, num_nodes)
+        # Make it symmetric for undirected graphs.
+        src, dst = torch.triu_indices(
+            num_nodes, num_nodes, device=E_t.device)
+        E_t[dst, src] = E_t[src, dst]
+
+        return E_t
+
+    def sample_X(self, prob_X):
+        """Sample node attributes from prob_X.
+
+        Parameters
+        ----------
+        prob_X : torch.Tensor of shape (F, |V|, 2)
+            Probability distributions for node attributes.
+
+        Returns
+        -------
+        X_t_one_hot : torch.Tensor of shape (|V|, 2 * F)
+            One-hot encoding of the sampled node attributes.
+        """
+        # (F * |V|)
+        X_t = prob_X.reshape(-1, prob_X.size(-1)).multinomial(1)
+        # (F, |V|)
+        X_t = X_t.reshape(self.num_attrs_X, -1)
+        # (|V|, 2 * F)
+        X_t_one_hot = torch.cat([
+            F.one_hot(X_t[i], num_classes=self.num_classes_X)
+            for i in range(self.num_attrs_X)
+        ], dim=1).float()
+
+        return X_t_one_hot
+
 class LossX(nn.Module):
     """
     Parameters
@@ -149,7 +235,7 @@ class ModelSync(BaseModel):
     Parameters
     ----------
     T : int
-        Number of diffusion time steps.
+        Number of diffusion time steps - 1.
     X_marginal : torch.Tensor of shape (F, 2)
         X_marginal[f, :] is the marginal distribution of the f-th node attribute.
     Y_marginal : torch.Tensor of shape (C)
@@ -186,6 +272,57 @@ class ModelSync(BaseModel):
 
         self.loss_X = LossX(self.num_attrs_X, self.num_classes_X)
 
+    def apply_noise(self, X_one_hot_3d, E_one_hot, t=None):
+        """Corrupt G and sample G^t.
+
+        Parameters
+        ----------
+        X_one_hot_3d : torch.Tensor of shape (F, |V|, 2)
+            X_one_hot_3d[f, :, :] is the one-hot encoding of the f-th node attribute.
+        E_one_hot : torch.Tensor of shape (|V|, |V|, 2)
+            - E_one_hot[:, :, 0] indicates the absence of an edge.
+            - E_one_hot[:, :, 1] is the original adjacency matrix.
+        t : torch.LongTensor of shape (1), optional
+            If specified, a time step will be enforced rather than sampled.
+
+        Returns
+        -------
+        t_float : torch.Tensor of shape (1)
+            Sampled timestep divided by self.T.
+        X_t_one_hot : torch.Tensor of shape (|V|, 2 * F)
+            One-hot encoding of the sampled node features.
+        E_t : torch.LongTensor of shape (|V|, |V|)
+            Sampled symmetric adjacency matrix.
+        """
+        if t is None:
+            # Sample a timestep t uniformly.
+            # Note that the notation is slightly inconsistent with the paper.
+            # t=0 corresponds to t=1 in the paper, where corruption has already taken place.
+            if self.training:
+                t = torch.randint(low=0, high=self.T + 1, size=(1,),
+                                  device=X_one_hot_3d.device)
+            else:
+                # For evaluation, the loss for t=0 is computed separately.
+                t = torch.randint(low=1, high=self.T + 1, size=(1,),
+                                  device=X_one_hot_3d.device)
+
+        alpha_bar_t = self.noise_schedule.alpha_bars[t]
+
+        # Sample A^t.
+        Q_bar_t_E = self.transition.get_Q_bar_E(alpha_bar_t) # (2, 2)
+        prob_E = E_one_hot @ Q_bar_t_E                       # (|V|, |V|, 2)
+        E_t = self.sample_E(prob_E)                          # (|V|, |V|)
+
+        # Sample X^t.
+        Q_bar_t_X = self.transition.get_Q_bar_X(alpha_bar_t) # (F, 2, 2)
+        # Compute matrix multiplication over the first batch dimension.
+        prob_X = torch.bmm(X_one_hot_3d, Q_bar_t_X)          # (F, |V|, 2)
+        X_t_one_hot = self.sample_X(prob_X)
+
+        t_float = t / self.T
+
+        return t_float, X_t_one_hot, E_t
+
     def log_p_t(self,
                 X_one_hot_3d,
                 E_one_hot,
@@ -194,7 +331,7 @@ class ModelSync(BaseModel):
                 batch_dst,
                 batch_E_one_hot,
                 t=None):
-        """Obtain G^t from G^0 and compute log p(G^0 | G^t, Y, t).
+        """Obtain G and compute log p(G | G^t, Y, t).
 
         Parameters
         ----------
@@ -217,3 +354,4 @@ class ModelSync(BaseModel):
         Returns
         -------
         """
+        t_float, X_t_one_hot, E_t = self.apply_noise(X_one_hot_3d, E_one_hot, t)

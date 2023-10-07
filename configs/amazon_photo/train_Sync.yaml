@@ -17,7 +17,7 @@ gnn_E : # GNN for reconstructing edges.
   dropout: 0. # Dropout rate.
 
 diffusion :
-  T : 3 # Number of diffusion steps.
+  T : 3 # Number of diffusion steps - 1, slightly inconsistent with the paper.
 
 optimizer_X :
   lr : 0.001 # Learning rate.
