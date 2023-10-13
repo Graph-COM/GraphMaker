@@ -376,3 +376,9 @@ class ModelSync(BaseModel):
         """
         t_float, X_t_one_hot, E_t = self.apply_noise(X_one_hot_3d, E_one_hot, t)
         A_t = self.get_adj(E_t)
+        logit_X, logit_E = self.graph_encoder(t_float,
+                                              X_t_one_hot,
+                                              Y,
+                                              A_t,
+                                              batch_src,
+                                              batch_dst)
