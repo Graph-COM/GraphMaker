@@ -118,6 +118,25 @@ class LossE(nn.Module):
     def __init__(self):
         super().__init__()
 
+    def forward(self, true_E, logit_E):
+        """
+        Parameters
+        ----------
+        true_E : torch.Tensor of shape (B, 2)
+            One-hot encoding of the edge existence for a batch of node pairs.
+        logit_E : torch.Tensor of shape (B, 2)
+            Predicted logits for the edge existence.
+
+        Returns
+        -------
+        loss_E : torch.Tensor
+            Scalar representing the loss for edge existence.
+        """
+        true_E = torch.argmax(true_E, dim=-1)    # (B)
+        loss_E = F.cross_entropy(logit_E, true_E)
+
+        return loss_E
+
 class BaseModel(nn.Module):
     """
     Parameters
@@ -393,12 +412,16 @@ class ModelSync(BaseModel):
         batch_dst : torch.LongTensor of shape (B)
             Destination node IDs for a batch of edges (node pairs).
         batch_E_one_hot : torch.Tensor of shape (B, 2)
-            batch_E_one_hot[batch_dst, batch_src].
+            E_one_hot[batch_dst, batch_src].
         t : torch.LongTensor of shape (1), optional
             If specified, a time step will be enforced rather than sampled.
 
         Returns
         -------
+        loss_X : torch.Tensor
+            Scalar representing the loss for node attributes.
+        loss_E : torch.Tensor
+            Scalar representing the loss for edge existence.
         """
         t_float, X_t_one_hot, E_t = self.apply_noise(X_one_hot_3d, E_one_hot, t)
         A_t = self.get_adj(E_t)
@@ -410,3 +433,6 @@ class ModelSync(BaseModel):
                                               batch_dst)
 
         loss_X = self.loss_X(X_one_hot_3d, logit_X)
+        loss_E = self.loss_E(batch_E_one_hot, logit_E)
+
+        return loss_X, loss_E

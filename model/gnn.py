@@ -316,7 +316,7 @@ class GNN(nn.Module):
         -------
         logit_X : torch.Tensor of shape (|V|, F, 2)
             Predicted logits for the node attributes.
-        logit_E : torch.Tensor of shape (|E|, 2)
+        logit_E : torch.Tensor of shape (B, 2)
             Predicted logits for the edge existence.
         """
         logit_X = self.pred_X(t_float,
