@@ -252,6 +252,25 @@ class BaseModel(nn.Module):
         D_t = dglsp.diag(A_t.sum(1)) ** -1
         return D_t @ A_t
 
+    def denoise_match_Z(self,
+                        Z_t_one_hot,
+                        Q_t_Z,
+                        Z_one_hot,
+                        Q_bar_s,
+                        pred_Z):
+        """Compute the denoising match term for Z given a
+        sampled t, i.e., the KL divergence between q(D^{t-1}| D, D^t) and
+        q(D^{t-1}| hat{p}^{D}, D^t).
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        float
+            KL value.
+        """
+
     def denoise_match_E(self,
                         t_float,
                         logit_E,
@@ -273,7 +292,30 @@ class BaseModel(nn.Module):
         E_one_hot : torch.Tensor of shape (B, 2)
             One-hot encoding of the original edge existence for the batch of
             node pairs.
+
+        Returns
+        -------
+        float
+            KL value.
         """
+        t = int(t_float.item() * self.T)
+        s = t - 1
+
+        alpha_bar_s = self.noise_schedule.alpha_bars[s]
+        alpha_t = self.noise_schedule.alphas[t]
+
+        Q_bar_s_E = self.transition.get_Q_bar_E(alpha_bar_s)
+        # Note that computing Q_bar_t from alpha_bar_t is the same
+        # as computing Q_t from alpha_t.
+        Q_t_E = self.transition.get_Q_bar_E(alpha_t)
+
+        pred_E = logit_E.softmax(dim=-1)
+
+        return self.denoise_match_Z(E_t_one_hot,
+                                    Q_t_E,
+                                    E_one_hot,
+                                    Q_bar_s_E,
+                                    pred_E)
 
 class LossX(nn.Module):
     """
