@@ -125,7 +125,12 @@ def main(args):
         log_p_0_X = []
         log_p_0_E = []
         for batch_edge_index in tqdm(val_data_loader):
-            pass
+            model.val_step(X_one_hot_3d,
+                           E_one_hot,
+                           Y,
+                           batch_src,
+                           batch_dst,
+                           E_one_hot[batch_dst, batch_src])
 
     wandb.finish()
 

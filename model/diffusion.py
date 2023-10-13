@@ -171,7 +171,7 @@ class BaseModel(nn.Module):
 
         self.T = T
         # Number of intermediate time steps to use for validation.
-        self.num_denoise_match_samples = self.T - 1
+        self.num_denoise_match_samples = self.T
         self.noise_schedule = NoiseSchedule(T, device)
 
         self.num_nodes = num_nodes
@@ -436,3 +436,53 @@ class ModelSync(BaseModel):
         loss_E = self.loss_E(batch_E_one_hot, logit_E)
 
         return loss_X, loss_E
+
+    @torch.no_grad()
+    def val_step(self,
+                 X_one_hot_3d,
+                 E_one_hot,
+                 Y,
+                 batch_src,
+                 batch_dst,
+                 batch_E_one_hot):
+        """Perform a validation step.
+
+        Parameters
+        ----------
+        X_one_hot_3d : torch.Tensor of shape (F, |V|, 2)
+            X_one_hot_3d[f, :, :] is the one-hot encoding of the f-th node attribute.
+        E_one_hot : torch.Tensor of shape (|V|, |V|, 2)
+            - E_one_hot[:, :, 0] indicates the absence of an edge.
+            - E_one_hot[:, :, 1] is the original adjacency matrix.
+        Y : torch.Tensor of shape (|V|)
+            Categorical node labels.
+        batch_src : torch.LongTensor of shape (B)
+            Source node IDs for a batch of edges (node pairs).
+        batch_dst : torch.LongTensor of shape (B)
+            Destination node IDs for a batch of edges (node pairs).
+        batch_E_one_hot : torch.Tensor of shape (B, 2)
+            E_one_hot[batch_dst, batch_src].
+
+        Returns
+        -------
+        """
+        device = E_one_hot.device
+
+        denoise_match_X = []
+        denoise_match_E = []
+
+        # t=0 is handled separately.
+        for t_sample in range(1, self.T + 1):
+            t = torch.LongTensor([t_sample]).to(device)
+            t_float, X_t_one_hot, E_t = self.apply_noise(
+                X_one_hot_3d, E_one_hot, t)
+            A_t = self.get_adj(E_t)
+            logit_X, logit_E = self.graph_encoder(t_float,
+                                                  X_t_one_hot,
+                                                  Y,
+                                                  A_t,
+                                                  batch_src,
+                                                  batch_dst)
+
+            E_t_one_hot = F.one_hot(E_t[batch_src, batch_dst],
+                                    num_classes=self.num_classes_E).float()
