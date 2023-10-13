@@ -302,7 +302,7 @@ class GNN(nn.Module):
         t_float : torch.Tensor of shape (1)
             Sampled timestep divided by self.T.
         X_t_one_hot : torch.Tensor of shape (|V|, 2 * F)
-            One-hot encoding of the sampled node features.
+            One-hot encoding of the sampled node attributes.
         Y : torch.Tensor of shape (|V|)
             Categorical node labels.
         A_t : dglsp.SparseMatrix
@@ -315,7 +315,7 @@ class GNN(nn.Module):
         Returns
         -------
         logit_X : torch.Tensor of shape (|V|, F, 2)
-            Predicted logits for the node features.
+            Predicted logits for the node attributes.
         logit_E : torch.Tensor of shape (|E|, 2)
             Predicted logits for the edge existence.
         """

@@ -250,6 +250,32 @@ class LossX(nn.Module):
         self.num_attrs_X = num_attrs_X
         self.num_classes_X = num_classes_X
 
+    def forward(self, true_X, logit_X):
+        """
+        Parameters
+        ----------
+        true_X : torch.Tensor of shape (F, |V|, 2)
+            X_one_hot_3d[f, :, :] is the one-hot encoding of the f-th node attribute.
+        logit_X : torch.Tensor of shape (|V|, F, 2)
+            Predicted logits for the node attributes.
+
+        Returns
+        -------
+        loss_X : torch.Tensor
+            Scalar representing the loss for node attributes.
+        """
+        true_X = true_X.transpose(0, 1)               # (|V|, F, 2)
+        # v1x1, v1x2, ..., v1xd, v2x1, ...
+        true_X = true_X.reshape(-1, true_X.size(-1))  # (|V| * F, 2)
+
+        # v1x1, v1x2, ..., v1xd, v2x1, ...
+        logit_X = logit_X.reshape(true_X.size(0), -1) # (|V| * F, 2)
+
+        true_X = torch.argmax(true_X, dim=-1)         # (|V| * F)
+        loss_X = F.cross_entropy(logit_X, true_X)
+
+        return loss_X
+
 class ModelSync(BaseModel):
     """
     Parameters
@@ -310,7 +336,7 @@ class ModelSync(BaseModel):
         t_float : torch.Tensor of shape (1)
             Sampled timestep divided by self.T.
         X_t_one_hot : torch.Tensor of shape (|V|, 2 * F)
-            One-hot encoding of the sampled node features.
+            One-hot encoding of the sampled node attributes.
         E_t : torch.LongTensor of shape (|V|, |V|)
             Sampled symmetric adjacency matrix.
         """
@@ -382,3 +408,5 @@ class ModelSync(BaseModel):
                                               A_t,
                                               batch_src,
                                               batch_dst)
+
+        loss_X = self.loss_X(X_one_hot_3d, logit_X)
