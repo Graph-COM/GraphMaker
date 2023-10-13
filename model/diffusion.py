@@ -252,6 +252,29 @@ class BaseModel(nn.Module):
         D_t = dglsp.diag(A_t.sum(1)) ** -1
         return D_t @ A_t
 
+    def denoise_match_E(self,
+                        t_float,
+                        logit_E,
+                        E_t_one_hot,
+                        E_one_hot):
+        """Compute the denoising match term for edge prediction given a
+        sampled t, i.e., the KL divergence between q(D^{t-1}| D, D^t) and
+        q(D^{t-1}| hat{p}^{D}, D^t).
+
+        Parameters
+        ----------
+        t_float : torch.Tensor of shape (1)
+            Sampled timestep divided by self.T.
+        logit_E : torch.Tensor of shape (B, 2)
+            Predicted logits for the edge existence of a batch of node pairs.
+        E_t_one_hot : torch.Tensor of shape (B, 2)
+            One-hot encoding of sampled edge existence for the batch of
+            node pairs.
+        E_one_hot : torch.Tensor of shape (B, 2)
+            One-hot encoding of the original edge existence for the batch of
+            node pairs.
+        """
+
 class LossX(nn.Module):
     """
     Parameters
@@ -486,3 +509,8 @@ class ModelSync(BaseModel):
 
             E_t_one_hot = F.one_hot(E_t[batch_src, batch_dst],
                                     num_classes=self.num_classes_E).float()
+            denoise_match_E_t = self.denoise_match_E(t_float,
+                                                     logit_E,
+                                                     E_t_one_hot,
+                                                     batch_E_one_hot)
+            denoise_match_E.append(denoise_match_E_t)
