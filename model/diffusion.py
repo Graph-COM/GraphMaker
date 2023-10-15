@@ -643,3 +643,21 @@ class ModelSync(BaseModel):
                                                      X_t_one_hot,
                                                      X_one_hot_3d)
             denoise_match_X.append(denoise_match_X_t)
+
+        denoise_match_E = float(np.mean(denoise_match_E)) * self.T
+        denoise_match_X = float(np.mean(denoise_match_X)) * self.T
+
+        # t=0
+        t_0 = torch.LongTensor([0]).to(device)
+        loss_X, loss_E = self.log_p_t(X_one_hot_3d,
+                                      E_one_hot,
+                                      Y,
+                                      batch_src,
+                                      batch_dst,
+                                      batch_E_one_hot,
+                                      t_0)
+        log_p_0_E = loss_E.item()
+        log_p_0_X = loss_X.item()
+
+        return denoise_match_E, denoise_match_X,\
+            log_p_0_E, log_p_0_X
