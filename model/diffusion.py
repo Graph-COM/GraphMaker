@@ -530,6 +530,32 @@ class ModelSync(BaseModel):
 
         return loss_X, loss_E
 
+    def denoise_match_X(self,
+                        t_float,
+                        logit_X,
+                        X_t_one_hot,
+                        X_one_hot_3d):
+        """Compute the denoising match term for node attribute prediction given a
+        sampled t, i.e., the KL divergence between q(D^{t-1}| D, D^t) and
+        q(D^{t-1}| hat{p}^{D}, D^t).
+
+        Parameters
+        ----------
+        t_float : torch.Tensor of shape (1)
+            Sampled timestep divided by self.T.
+        logit_X : torch.Tensor of shape (|V|, F, 2)
+            Predicted logits for the node attributes.
+        X_t_one_hot : torch.Tensor of shape (|V|, 2 * F)
+            One-hot encoding of the node attributes sampled at time step t.
+        X_one_hot_3d : torch.Tensor of shape (F, |V|, 2)
+            X_one_hot_3d[f, :, :] is the one-hot encoding of the f-th node attribute.
+
+        Returns
+        -------
+        float
+            KL value for node attributes.
+        """
+
     @torch.no_grad()
     def val_step(self,
                  X_one_hot_3d,
@@ -584,3 +610,9 @@ class ModelSync(BaseModel):
                                                      E_t_one_hot,
                                                      batch_E_one_hot)
             denoise_match_E.append(denoise_match_E_t)
+
+            denoise_match_X_t = self.denoise_match_X(t_float,
+                                                     logit_X,
+                                                     X_t_one_hot,
+                                                     X_one_hot_3d)
+            denoise_match_X.append(denoise_match_X_t)
