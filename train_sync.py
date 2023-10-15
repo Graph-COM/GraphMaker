@@ -1,5 +1,6 @@
-import pandas as pd
 import numpy as np
+import os
+import pandas as pd
 import torch
 import torch.nn as nn
 import wandb
@@ -81,6 +82,10 @@ def main(args):
     best_val_nll_E = float('inf')
     best_log_p_0_E = float('inf')
     best_denoise_match_E = float('inf')
+
+    # Create the directory for saving model checkpoints.
+    model_cpt_dir = f"{args.dataset}_cpts"
+    os.makedirs(model_cpt_dir, exist_ok=True)
 
     num_patient_epochs = 0
     for epoch in range(train_config["num_epochs"]):
@@ -173,7 +178,7 @@ def main(args):
                 "best_epoch_E": best_epoch_E,
                 "pred_X_state_dict": best_state_dict_X,
                 "pred_E_state_dict": best_state_dict_E
-            }, f"{args.dataset}_cpts/{model_name}_T{T}.pth")
+            }, f"{model_cpt_dir}/{model_name}_T{T}.pth")
             print('model saved')
 
         if log_p_0_X < best_log_p_0_X:
