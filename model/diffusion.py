@@ -555,6 +555,33 @@ class ModelSync(BaseModel):
         float
             KL value for node attributes.
         """
+        t = int(t_float.item() * self.T)
+        s = t - 1
+
+        alpha_bar_s = self.noise_schedule.alpha_bars[s]
+        alpha_t = self.noise_schedule.alphas[t]
+
+        Q_bar_s_X = self.transition.get_Q_bar_X(alpha_bar_s)
+        # Note that computing Q_bar_t from alpha_bar_t is the same
+        # as computing Q_t from alpha_t.
+        Q_t_X = self.transition.get_Q_bar_X(alpha_t)
+
+        # (|V|, F, 2)
+        pred_X = logit_X.softmax(dim=-1)
+        # (F, |V|, 2)
+        pred_X = torch.transpose(pred_X, 0, 1)
+
+        num_nodes = X_t_one_hot.size(0)
+        # (|V|, F, 2)
+        X_t_one_hot = X_t_one_hot.reshape(num_nodes, self.num_attrs_X, -1)
+        # (F, |V|, 2)
+        X_t_one_hot = torch.transpose(X_t_one_hot, 0, 1)
+
+        return self.denoise_match_Z(X_t_one_hot,
+                                    Q_t_X,
+                                    X_one_hot_3d,
+                                    Q_bar_s_X,
+                                    pred_X)
 
     @torch.no_grad()
     def val_step(self,
