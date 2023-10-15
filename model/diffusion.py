@@ -256,7 +256,7 @@ class BaseModel(nn.Module):
                         Z_t_one_hot,
                         Q_t_Z,
                         Z_one_hot,
-                        Q_bar_s,
+                        Q_bar_s_Z,
                         pred_Z):
         """Compute the denoising match term for Z given a
         sampled t, i.e., the KL divergence between q(D^{t-1}| D, D^t) and
@@ -264,12 +264,40 @@ class BaseModel(nn.Module):
 
         Parameters
         ----------
+        Z_t_one_hot : torch.Tensor of shape (B, C) or (A, B, C)
+            One-hot encoding of the data sampled at time step t.
+        Q_t_Z : torch.Tensor of shape (C, C) or (A, C, C)
+            Transition matrix from time step t - 1 to t.
+        Z_one_hot : torch.Tensor of shape (B, C) or (A, B, C)
+            One-hot encoding of the original data.
+        Q_bar_s_Z : torch.Tensor of shape (C, C) or (A, C, C)
+            Transition matrix from timestep 0 to t-1.
+        pred_Z : torch.Tensor of shape (B, C) or (A, B, C)
+            Predicted probs for the original data.
 
         Returns
         -------
         float
             KL value.
         """
+        # q(Z^{t-1}| Z, Z^t)
+        left_term = Z_t_one_hot @ torch.transpose(Q_t_Z, -1, -2) # (B, C) or (A, B, C)
+        right_term = Z_one_hot @ Q_bar_s_Z                       # (B, C) or (A, B, C)
+        product = left_term * right_term                         # (B, C) or (A, B, C)
+        denom = product.sum(dim=-1)                              # (B,) or (A, B)
+        denom[denom == 0.] = 1
+        prob_true = product / denom.unsqueeze(-1)                # (B, C) or (A, B, C)
+
+        # q(Z^{t-1}| hat{p}^{Z}, Z^t)
+        right_term = pred_Z @ Q_bar_s_Z                          # (B, C) or (A, B, C)
+        product = left_term * right_term                         # (B, C) or (A, B, C)
+        denom = product.sum(dim=-1)                              # (B,) or (A, B)
+        denom[denom == 0.] = 1
+        prob_pred = product / denom.unsqueeze(-1)                # (B, C) or (A, B, C)
+
+        # KL(q(Z^{t-1}| hat{p}^{Z}, Z^t) || q(Z^{t-1}| Z, Z^t))
+        kl = F.kl_div(input=prob_pred.log(), target=prob_true, reduction='none')
+        return kl.clamp(min=0).mean().item()
 
     def denoise_match_E(self,
                         t_float,
