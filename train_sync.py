@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import torch
 import torch.nn as nn
 import wandb
@@ -120,17 +121,98 @@ def main(args):
 
         num_patient_epochs += 1
 
-        denoise_match_X = []
         denoise_match_E = []
-        log_p_0_X = []
+        denoise_match_X = []
         log_p_0_E = []
+        log_p_0_X = []
         for batch_edge_index in tqdm(val_data_loader):
-            model.val_step(X_one_hot_3d,
-                           E_one_hot,
-                           Y,
-                           batch_src,
-                           batch_dst,
-                           E_one_hot[batch_dst, batch_src])
+            batch_dst, batch_src = batch_edge_index.T
+
+            batch_denoise_match_E, batch_denoise_match_X,\
+                batch_log_p_0_E, batch_log_p_0_X = model.val_step(
+                    X_one_hot_3d,
+                    E_one_hot,
+                    Y,
+                    batch_src,
+                    batch_dst,
+                    E_one_hot[batch_dst, batch_src])
+
+            denoise_match_E.append(batch_denoise_match_E)
+            denoise_match_X.append(batch_denoise_match_X)
+            log_p_0_E.append(batch_log_p_0_E)
+            log_p_0_X.append(batch_log_p_0_X)
+
+        denoise_match_E = np.mean(denoise_match_E)
+        denoise_match_X = np.mean(denoise_match_X)
+        log_p_0_E = np.mean(log_p_0_E)
+        log_p_0_X = np.mean(log_p_0_X)
+
+        val_X = denoise_match_X + log_p_0_X
+        val_E = denoise_match_E + log_p_0_E
+
+        to_save_cpt = False
+        if val_X < best_val_nll_X:
+            best_val_nll_X = val_X
+            best_epoch_X = epoch
+            best_state_dict_X = deepcopy(model.graph_encoder.pred_X.state_dict())
+            to_save_cpt = True
+
+        if val_E < best_val_nll_E:
+            best_val_nll_E = val_E
+            best_epoch_E = epoch
+            best_state_dict_E = deepcopy(model.graph_encoder.pred_E.state_dict())
+            to_save_cpt = True
+
+        if to_save_cpt:
+            best_val_nll = best_val_nll_X + best_val_nll_E
+            torch.save({
+                "dataset": args.dataset,
+                "train_yaml_data": yaml_data,
+                "best_val_nll": best_val_nll,
+                "best_epoch_X": best_epoch_X,
+                "best_epoch_E": best_epoch_E,
+                "pred_X_state_dict": best_state_dict_X,
+                "pred_E_state_dict": best_state_dict_E
+            }, f"{args.dataset}_cpts/{model_name}_T{T}.pth")
+            print('model saved')
+
+        if log_p_0_X < best_log_p_0_X:
+            best_log_p_0_X = log_p_0_X
+            num_patient_epochs = 0
+
+        if denoise_match_X < best_denoise_match_X:
+            best_denoise_match_X = denoise_match_X
+            num_patient_epochs = 0
+
+        if log_p_0_E < best_log_p_0_E:
+            best_log_p_0_E = log_p_0_E
+            num_patient_epochs = 0
+
+        if denoise_match_E < best_denoise_match_E:
+            best_denoise_match_E = denoise_match_E
+            num_patient_epochs = 0
+
+        wandb.log({"epoch": epoch,
+                   "val/denoise_match_X": denoise_match_X,
+                   "val/denoise_match_E": denoise_match_E,
+                   "val/log_p_0_X": log_p_0_X,
+                   "val/log_p_0_E": log_p_0_E,
+                   "val/best_log_p_0_X": best_log_p_0_X,
+                   "val/best_denoise_match_X": best_denoise_match_X,
+                   "val/best_log_p_0_E": best_log_p_0_E,
+                   "val/best_denoise_match_E": best_denoise_match_E,
+                   "val/best_val_X": best_val_nll_X,
+                   "val/best_val_E": best_val_nll_E,
+                   "val/best_val_nll": best_val_nll})
+
+        print("Epoch {} | best val X nll {:.7f} | best val E nll {:.7f} | patience {}/{}".format(
+            epoch, best_val_nll_X, best_val_nll_E, num_patient_epochs, train_config["patient_epochs"]))
+
+        if num_patient_epochs == train_config["patient_epochs"]:
+            break
+
+        lr_scheduler_X.step(log_p_0_X)
+        lr_scheduler_E.step(log_p_0_E)
 
     wandb.finish()
 
