@@ -186,3 +186,12 @@ class Evaluator:
         """
         if add_mask:
             dgl_g = self.add_mask(dgl_g, Y_one_hot)
+
+        F = X_one_hot_3d.size(0)
+        # (|V|, F)
+        X = torch.zeros(X_one_hot_3d.size(1), F)
+        for f in range(F):
+            X[:, f] = X_one_hot_3d[f].argmax(dim=1)
+
+        import ipdb
+        ipdb.set_trace()
