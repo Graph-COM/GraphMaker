@@ -1,5 +1,64 @@
 import dgl
+import dgl.function as fn
+import networkx as nx
 import torch
+
+def get_triangle_count(nx_g):
+    triangle_count = sum(nx.triangles(nx.to_undirected(nx_g)).values()) / 3
+    return triangle_count
+
+def linkx_homophily(graph, y):
+    r"""Homophily measure from `Large Scale Learning on Non-Homophilous Graphs:
+    New Benchmarks and Strong Simple Methods
+    <https://arxiv.org/abs/2110.14446>`__
+
+    Mathematically it is defined as follows:
+
+    .. math::
+      \frac{1}{C-1} \sum_{k=1}^{C} \max \left(0, \frac{\sum_{v\in C_k}|\{u\in
+      \mathcal{N}(v): y_v = y_u \}|}{\sum_{v\in C_k}|\mathcal{N}(v)|} -
+      \frac{|\mathcal{C}_k|}{|\mathcal{V}|} \right),
+
+    where :math:`C` is the number of node classes, :math:`C_k` is the set of
+    nodes that belong to class k, :math:`\mathcal{N}(v)` are the predecessors
+    of node :math:`v`, :math:`y_v` is the class of node :math:`v`, and
+    :math:`\mathcal{V}` is the set of nodes.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The graph.
+    y : torch.Tensor
+        The node labels, which is a tensor of shape (|V|).
+
+    Returns
+    -------
+    float
+        The homophily value.
+    """
+    with graph.local_scope():
+        # Compute |{u\in N(v): y_v = y_u}| for each node v.
+        src, dst = graph.edges()
+        # Compute y_v = y_u for all edges.
+        graph.edata["same_class"] = (y[src] == y[dst]).float()
+        graph.update_all(
+            fn.copy_e("same_class", "m"), fn.sum("m", "same_class_deg")
+        )
+
+        deg = graph.in_degrees().float()
+        num_nodes = graph.num_nodes()
+        num_classes = y.max(dim=0).values.item() + 1
+
+        value = torch.tensor(0.0).to(graph.device)
+        for k in range(num_classes):
+            # Get the nodes that belong to class k.
+            class_mask = y == k
+            same_class_deg_k = graph.ndata["same_class_deg"][class_mask].sum()
+            deg_k = deg[class_mask].sum()
+            num_nodes_k = class_mask.sum()
+            value += max(0, same_class_deg_k / deg_k - num_nodes_k / num_nodes)
+
+        return value.item() / (num_classes - 1)
 
 class Evaluator:
     def __init__(self,
@@ -211,3 +270,10 @@ class Evaluator:
             dgl_subg = self.sample_subg(dgl_g)
         else:
             dgl_subg = dgl_g
+
+        nx_g = nx.DiGraph(dgl_subg.cpu().to_networkx())
+
+        triangle_count = get_triangle_count(nx_g)
+
+        Y = Y_one_hot.argmax(dim=-1)
+        linkx_A = linkx_homophily(dgl_g, Y)
