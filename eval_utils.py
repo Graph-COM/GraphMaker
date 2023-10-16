@@ -157,6 +157,10 @@ class Evaluator:
         self.data_dict_real = data_dict_real
         self.data_dict_sample_list = []
 
+        num_classes = len(Y_real.unique())
+
+        os.makedirs(f"{data_name}_cpts", exist_ok=True)
+
     def add_mask_cora(self, dgl_g, Y_one_hot):
         num_nodes = dgl_g.num_nodes()
         train_mask = torch.zeros(num_nodes)
