@@ -1,7 +1,13 @@
 import dgl
 import dgl.function as fn
 import networkx as nx
+import numpy as np
+import os
+import secrets
+import subprocess as sp
 import torch
+
+from string import ascii_uppercase, digits
 
 def get_triangle_count(nx_g):
     triangle_count = sum(nx.triangles(nx.to_undirected(nx_g)).values()) / 3
@@ -60,6 +66,58 @@ def linkx_homophily(graph, y):
 
         return value.item() / (num_classes - 1)
 
+def edge_list_reindexed(G):
+    idx = 0
+    id2idx = dict()
+    for u in G.nodes():
+        id2idx[str(u)] = idx
+        idx += 1
+
+    edges = []
+    for (u, v) in G.edges():
+        edges.append((id2idx[str(u)], id2idx[str(v)]))
+    return edges
+
+COUNT_START_STR = 'orbit counts:'
+
+def orca(graph):
+    graph = graph.to_undirected()
+
+    tmp_fname = f'orca/tmp_{"".join(secrets.choice(ascii_uppercase + digits) for i in range(8))}.txt'
+    tmp_fname = os.path.join(os.path.dirname(os.path.realpath(__file__)), tmp_fname)
+
+    with open(tmp_fname, 'w') as f:
+        f.write(str(graph.number_of_nodes()) + ' ' + str(graph.number_of_edges()) + '\n')
+        for (u, v) in edge_list_reindexed(graph):
+            f.write(str(u) + ' ' + str(v) + '\n')
+    output = sp.check_output(
+        [str(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'orca/orca')), 'node', '4', tmp_fname, 'std'])
+    output = output.decode('utf8').strip()
+    idx = output.find(COUNT_START_STR) + len(COUNT_START_STR) + 2
+    output = output[idx:]
+
+    node_orbit_counts = np.array([
+        list(map(int, node_cnts.strip().split(' ')))
+        for node_cnts in output.strip('\n').split('\n')
+    ])
+
+    try:
+        os.remove(tmp_fname)
+    except OSError:
+        pass
+
+    return node_orbit_counts
+
+def get_orbit_dist(nx_g):
+    # (|V|, Q), where Q is the number of unique orbits
+    orbit_counts = orca(nx_g)
+
+    orbit_counts = np.sum(orbit_counts, axis=0) / nx_g.number_of_nodes()
+    orbit_counts = torch.from_numpy(orbit_counts)
+    orbit_dist = orbit_counts / max(orbit_counts.sum(), 1)
+
+    return orbit_dist
+
 class Evaluator:
     def __init__(self,
                  data_name,
@@ -91,10 +149,13 @@ class Evaluator:
             add_mask = True
             torch.manual_seed(0)
 
-        self.preprocess_g(dgl_g_real,
-                          X_one_hot_3d_real,
-                          Y_one_hot_real,
-                          add_mask)
+        dgl_g_real, X_real, Y_real, data_dict_real = self.preprocess_g(
+            dgl_g_real,
+            X_one_hot_3d_real,
+            Y_one_hot_real,
+            add_mask)
+        self.data_dict_real = data_dict_real
+        self.data_dict_sample_list = []
 
     def add_mask_cora(self, dgl_g, Y_one_hot):
         num_nodes = dgl_g.num_nodes()
@@ -266,6 +327,17 @@ class Evaluator:
         add_mask : bool
             Whether to add a mask to the graph for node classification
             data split.
+
+        Returns
+        -------
+        dgl_g : dgl.DGLGraph
+            Graph, potentially with node mask added.
+        X : torch.Tensor of shape (|V|, F)
+            Node attributes.
+        Y : torch.Tensor of shape (|V|)
+            Categorical node label.
+        data_dict : dict
+            Dictionary of graph statistics.
         """
         if add_mask:
             dgl_g = self.add_mask(dgl_g, Y_one_hot)
@@ -290,3 +362,18 @@ class Evaluator:
 
         dgl_g_pow_2 = self.k_order_g(dgl_g, 2)
         linkx_A_pow_2 = linkx_homophily(dgl_g_pow_2, Y)
+
+        degs = dgl_g.in_degrees()
+        cluster_coefs = list(nx.clustering(nx_g).values())
+        orbit_dist = get_orbit_dist(nx_g)
+
+        data_dict = {
+            "triangle_count": triangle_count,
+            "linkx_A": linkx_A,
+            "linkx_A_pow_2": linkx_A_pow_2,
+            "degs": degs,
+            "cluster_coefs": cluster_coefs,
+            "orbit_dist": orbit_dist,
+        }
+
+        return dgl_g, X, Y, data_dict
