@@ -31,9 +31,6 @@ class Evaluator:
             add_mask = True
             torch.manual_seed(0)
 
-        # TODO: Add mask test
-        add_mask = True
-
         self.preprocess_g(dgl_g_real,
                           X_one_hot_3d_real,
                           Y_one_hot_real,
