@@ -8,7 +8,13 @@ class BaseTrainer:
                  hyper_space,
                  search_priority_increasing,
                  patience):
-        """Base class for training a discriminative model."""
+        """Base class for training a discriminative model.
+
+        Parameters
+        ----------
+        search_priority_increasing : list of str
+            The priority of hyperparameters to search, from lowest to highest.
+        """
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.device = torch.device(device)
 
@@ -23,9 +29,6 @@ class BaseTrainer:
         for items in itertools.product(*vals):
             items_dict = dict(zip(self.search_priority_increasing, items))
             config_list.append(items_dict)
-
-        import ipdb
-        ipdb.set_trace()
 
         return config_list
 

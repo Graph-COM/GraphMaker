@@ -9,7 +9,7 @@ import torch
 
 from string import ascii_uppercase, digits
 
-from model import MLPTrainer
+from model import BaseEvaluator, MLPTrainer
 
 def get_triangle_count(nx_g):
     triangle_count = sum(nx.triangles(nx.to_undirected(nx_g)).values()) / 3
@@ -162,6 +162,14 @@ class Evaluator:
         num_classes = len(Y_real.unique())
 
         os.makedirs(f"{data_name}_cpts", exist_ok=True)
+        self.mlp_evaluator = BaseEvaluator(MLPTrainer,
+                                           f"{data_name}_cpts/mlp.pth",
+                                           num_classes,
+                                           train_mask=dgl_g_real.ndata["train_mask"],
+                                           val_mask=dgl_g_real.ndata["val_mask"],
+                                           test_mask=dgl_g_real.ndata["test_mask"],
+                                           X=X_real,
+                                           Y=Y_real)
 
     def add_mask_cora(self, dgl_g, Y_one_hot):
         num_nodes = dgl_g.num_nodes()
