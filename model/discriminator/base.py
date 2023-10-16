@@ -22,6 +22,9 @@ class BaseTrainer:
             items_dict = dict(zip(self.search_priority_increasing, items))
             config_list.append(items_dict)
 
+        import ipdb
+        ipdb.set_trace()
+
         return config_list
 
     def save_model(self, model_path):

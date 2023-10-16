@@ -9,6 +9,8 @@ import torch
 
 from string import ascii_uppercase, digits
 
+from model import MLPTrainer
+
 def get_triangle_count(nx_g):
     triangle_count = sum(nx.triangles(nx.to_undirected(nx_g)).values()) / 3
     return triangle_count
