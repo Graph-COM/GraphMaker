@@ -13,6 +13,11 @@ class Evaluator:
             Name of the dataset.
         dgl_g_real : dgl.DGLGraph
             Real graph.
+        X_one_hot_3d_real : torch.Tensor of shape (F, |V|, 2)
+            X_one_hot_3d_real[f, :, :] is the one-hot encoding of the f-th node
+            attribute in the real graph.
+        Y_one_hot_real : torch.Tensor of shape (|V|, C)
+            One-hot encoding of the node label in the real graph.
         """
         self.data_name = data_name
 
@@ -26,13 +31,62 @@ class Evaluator:
             add_mask = True
             torch.manual_seed(0)
 
+        # TODO: Add mask test
+        add_mask = True
+
         self.preprocess_g(dgl_g_real,
                           X_one_hot_3d_real,
                           Y_one_hot_real,
                           add_mask)
 
     def add_mask_cora(self, dgl_g, Y_one_hot):
-        pass
+        num_nodes = dgl_g.num_nodes()
+        train_mask = torch.zeros(num_nodes)
+        val_mask = torch.zeros(num_nodes)
+        test_mask = torch.zeros(num_nodes)
+
+        # Based on the raw graph
+        num_val_nodes = {
+            0: 61,
+            1: 36,
+            2: 78,
+            3: 158,
+            4: 81,
+            5: 57,
+            6: 29
+        }
+
+        num_test_nodes = {
+            0: 130,
+            1: 91,
+            2: 144,
+            3: 319,
+            4: 149,
+            5: 103,
+            6: 64
+        }
+
+        num_classes = Y_one_hot.size(-1)
+        for y in range(num_classes):
+            nodes_y = (Y_one_hot[:, y] == 1.).nonzero().squeeze(-1)
+            nid_y = torch.randperm(len(nodes_y))
+            nodes_y = nodes_y[nid_y]
+
+            train_mask[nodes_y[:20]] = 1.
+
+            start = 20
+            end = start + num_val_nodes[y]
+            val_mask[nodes_y[start: end]] = 1.
+
+            start = end
+            end = start + num_test_nodes[y]
+            test_mask[nodes_y[start: end]] = 1.
+
+        dgl_g.ndata["train_mask"] = train_mask.bool()
+        dgl_g.ndata["val_mask"] = val_mask.bool()
+        dgl_g.ndata["test_mask"] = test_mask.bool()
+
+        return dgl_g
 
     def add_mask_citeseer(self, dgl_g, Y_one_hot):
         pass
@@ -55,5 +109,19 @@ class Evaluator:
                      X_one_hot_3d,
                      Y_one_hot,
                      add_mask):
-        """"""
-        pass
+        """
+        Parameters
+        ----------
+        dgl_g : dgl.DGLGraph
+            Graph.
+        X_one_hot_3d : torch.Tensor of shape (F, |V|, 2)
+            X_one_hot_3d[f, :, :] is the one-hot encoding of the f-th node
+            attribute in the graph.
+        Y_one_hot : torch.Tensor of shape (|V|, C)
+            One-hot encoding of the node label in the graph.
+        add_mask : bool
+            Whether to add a mask to the graph for node classification
+            data split.
+        """
+        if add_mask:
+            dgl_g = self.add_mask(dgl_g, Y_one_hot)

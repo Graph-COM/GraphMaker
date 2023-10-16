@@ -16,7 +16,7 @@ def main(args):
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-    g_real = load_dataset(args.dataset)
+    g_real = load_dataset(dataset)
     X_one_hot_3d_real, Y_real, E_one_hot_real,\
         X_marginal, Y_marginal, E_marginal, X_cond_Y_marginals = preprocess(g_real)
     Y_one_hot_real = F.one_hot(Y_real)
