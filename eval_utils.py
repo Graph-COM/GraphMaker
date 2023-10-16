@@ -1,3 +1,4 @@
+import dgl
 import torch
 
 class Evaluator:
@@ -165,6 +166,19 @@ class Evaluator:
         else:
             raise ValueError(f'Unexpected data name: {self.data_name}')
 
+    def sample_subg(self, dgl_g):
+        # Sample edge-induced subgraph for costly computation.
+        A = dgl_g.adj().to_dense()
+        A_upper = torch.triu(A, diagonal=1)
+        # (|E|, 2)
+        edges = A_upper.nonzero()
+        indices = torch.randperm(edges.size(0))[:self.edge_limit // 2]
+        src, dst = edges[indices].T
+        sub_g = dgl.graph((src, dst), num_nodes=dgl_g.num_nodes())
+        sub_g = dgl.to_bidirected(sub_g)
+
+        return sub_g
+
     def preprocess_g(self,
                      dgl_g,
                      X_one_hot_3d,
@@ -193,5 +207,7 @@ class Evaluator:
         for f in range(F):
             X[:, f] = X_one_hot_3d[f].argmax(dim=1)
 
-        import ipdb
-        ipdb.set_trace()
+        if dgl_g.num_edges() > self.edge_limit:
+            dgl_subg = self.sample_subg(dgl_g)
+        else:
+            dgl_subg = dgl_g
