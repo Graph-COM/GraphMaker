@@ -50,7 +50,10 @@ python train_sync.py -d D
 ### Sample
 
 ```bash
+python sample.py --model_path P
 ```
+
+`P` is the path to a model checkpoint saved in the training stage.
 
 ## Frequently Asked Questions
 
