@@ -238,6 +238,16 @@ class Evaluator:
 
         return sub_g
 
+    def k_order_g(self, dgl_g, k):
+        # Get DGLGraph of A^k.
+        A = dgl_g.adj().to_dense()
+        A_new = A
+        for _ in range(k-1):
+            A_new = A_new @ A
+        src, dst = A_new.nonzero().T
+        new_g = dgl.graph((src, dst), num_nodes=dgl_g.num_nodes())
+        return new_g
+
     def preprocess_g(self,
                      dgl_g,
                      X_one_hot_3d,
@@ -277,3 +287,6 @@ class Evaluator:
 
         Y = Y_one_hot.argmax(dim=-1)
         linkx_A = linkx_homophily(dgl_g, Y)
+
+        dgl_g_pow_2 = self.k_order_g(dgl_g, 2)
+        linkx_A_pow_2 = linkx_homophily(dgl_g_pow_2, Y)
