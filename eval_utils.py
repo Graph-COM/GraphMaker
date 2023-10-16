@@ -133,7 +133,27 @@ class Evaluator:
         return dgl_g
 
     def add_mask_benchmark(self, dgl_g, Y_one_hot):
-        pass
+        num_nodes = dgl_g.num_nodes()
+        train_mask = torch.zeros(num_nodes)
+        val_mask = torch.zeros(num_nodes)
+        test_mask = torch.zeros(num_nodes)
+
+        num_classes = Y_one_hot.size(-1)
+        for y in range(num_classes):
+            nodes_y = (Y_one_hot[:, y] == 1.).nonzero().squeeze(-1)
+            nid_y = torch.randperm(len(nodes_y))
+            nodes_y = nodes_y[nid_y]
+
+            # Based on the raw paper.
+            train_mask[nodes_y[:20]] = 1.
+            val_mask[nodes_y[20: 50]] = 1.
+            test_mask[nodes_y[50:]] = 1.
+
+        dgl_g.ndata["train_mask"] = train_mask.bool()
+        dgl_g.ndata["val_mask"] = val_mask.bool()
+        dgl_g.ndata["test_mask"] = test_mask.bool()
+
+        return dgl_g
 
     def add_mask(self, dgl_g, Y_one_hot):
         if self.data_name == "cora":
