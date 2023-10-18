@@ -12,7 +12,7 @@ from functools import partial
 from string import ascii_uppercase, digits
 
 from model import BaseEvaluator, MLPTrainer, SGCTrainer, GCNTrainer,\
-    APPNPTrainer
+    APPNPTrainer, GAETrainer
 
 def get_triangle_count(nx_g):
     triangle_count = sum(nx.triangles(nx.to_undirected(nx_g)).values()) / 3
@@ -304,6 +304,30 @@ class Evaluator:
         # Fix the raw graph split for reproducibility.
         torch.manual_seed(0)
         A_real_train, train_mask, val_mask, test_mask = prepare_for_GAE(A_real)
+
+        self.gae_one_layer_evaluator = BaseEvaluator(
+            partial(GAETrainer, num_gnn_layers=1),
+            f"{data_name}_cpts/gae_one_layer.pth",
+            num_classes,
+            train_mask=train_mask,
+            val_mask=val_mask,
+            test_mask=test_mask,
+            A_train=A_real_train,
+            A_full=A_real,
+            X=X_real,
+            Y=Y_real)
+
+        self.gae_two_layer_evaluator = BaseEvaluator(
+            partial(GAETrainer, num_gnn_layers=2),
+            f"{data_name}_cpts/gae_two_layer.pth",
+            num_classes,
+            train_mask=train_mask,
+            val_mask=val_mask,
+            test_mask=test_mask,
+            A_train=A_real_train,
+            A_full=A_real,
+            X=X_real,
+            Y=Y_real)
 
     def add_mask_cora(self, dgl_g, Y_one_hot):
         num_nodes = dgl_g.num_nodes()
