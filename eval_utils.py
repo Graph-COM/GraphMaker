@@ -8,9 +8,10 @@ import secrets
 import subprocess as sp
 import torch
 
+from functools import partial
 from string import ascii_uppercase, digits
 
-from model import BaseEvaluator, MLPTrainer
+from model import BaseEvaluator, MLPTrainer, SGCTrainer
 
 def get_triangle_count(nx_g):
     triangle_count = sum(nx.triangles(nx.to_undirected(nx_g)).values()) / 3
@@ -184,6 +185,17 @@ class Evaluator:
                                            Y=Y_real)
 
         A_real = get_adj(dgl_g_real)
+
+        self.sgc_one_layer_evaluator = BaseEvaluator(
+            partial(SGCTrainer, num_gnn_layers=1),
+            f"{data_name}_cpts/sgc_one_layer.pth",
+            num_classes,
+            train_mask=dgl_g_real.ndata["train_mask"],
+            val_mask=dgl_g_real.ndata["val_mask"],
+            test_mask=dgl_g_real.ndata["test_mask"],
+            A=A_real,
+            X=X_real,
+            Y=Y_real)
 
     def add_mask_cora(self, dgl_g, Y_one_hot):
         num_nodes = dgl_g.num_nodes()
