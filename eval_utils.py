@@ -1,5 +1,6 @@
 import dgl
 import dgl.function as fn
+import dgl.sparse as dglsp
 import networkx as nx
 import numpy as np
 import os
@@ -120,6 +121,17 @@ def get_orbit_dist(nx_g):
 
     return orbit_dist
 
+def get_adj(dgl_g):
+    # Get symmetrically normalized adjacency matrix.
+    A = dgl_g.adj()
+    N = dgl_g.num_nodes()
+    I = dglsp.identity((N, N), device=dgl_g.device)
+    A_hat = A + I
+    D_hat = dglsp.diag(A_hat.sum(1)) ** -0.5
+    A_norm = D_hat @ A_hat @ D_hat
+
+    return A_norm
+
 class Evaluator:
     def __init__(self,
                  data_name,
@@ -170,6 +182,8 @@ class Evaluator:
                                            test_mask=dgl_g_real.ndata["test_mask"],
                                            X=X_real,
                                            Y=Y_real)
+
+        A_real = get_adj(dgl_g_real)
 
     def add_mask_cora(self, dgl_g, Y_one_hot):
         num_nodes = dgl_g.num_nodes()
