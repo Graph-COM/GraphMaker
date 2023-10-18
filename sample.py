@@ -3,6 +3,7 @@ import torch.nn.functional as F
 
 from data import load_dataset, preprocess
 from eval_utils import Evaluator
+from setup_utils import set_seed
 
 def main(args):
     state_dict = torch.load(args.model_path)
@@ -25,6 +26,31 @@ def main(args):
                           g_real,
                           X_one_hot_3d_real,
                           Y_one_hot_real)
+
+    X_marginal = X_marginal.to(device)
+    Y_marginal = Y_marginal.to(device)
+    E_marginal = E_marginal.to(device)
+    X_cond_Y_marginals = X_cond_Y_marginals.to(device)
+    num_nodes = Y_real.size(0)
+
+    if model_name == "Sync":
+        from model import ModelSync
+
+        model = ModelSync(X_marginal=X_marginal,
+                          Y_marginal=Y_marginal,
+                          E_marginal=E_marginal,
+                          gnn_X_config=train_yaml_data["gnn_X"],
+                          gnn_E_config=train_yaml_data["gnn_E"],
+                          num_nodes=num_nodes,
+                          **train_yaml_data["diffusion"]).to(device)
+
+        model.graph_encoder.pred_X.load_state_dict(state_dict["pred_X_state_dict"])
+        model.graph_encoder.pred_E.load_state_dict(state_dict["pred_E_state_dict"])
+
+    model.eval()
+
+    # Set seed for better reproducibility.
+    set_seed()
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
