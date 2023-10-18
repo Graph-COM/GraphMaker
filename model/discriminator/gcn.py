@@ -64,7 +64,7 @@ class GCNTrainer(BaseTrainer):
         num_epochs = 1000
         num_patient_epochs = 0
         best_acc = 0
-        best_model_state_dict = model.state_dict()
+        best_model_state_dict = deepcopy(model.state_dict())
         for epoch in range(1, num_epochs + 1):
             model.train()
             logits = model(A, X)

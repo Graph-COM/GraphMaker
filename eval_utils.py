@@ -11,7 +11,8 @@ import torch
 from functools import partial
 from string import ascii_uppercase, digits
 
-from model import BaseEvaluator, MLPTrainer, SGCTrainer, GCNTrainer
+from model import BaseEvaluator, MLPTrainer, SGCTrainer, GCNTrainer,\
+    APPNPTrainer
 
 def get_triangle_count(nx_g):
     triangle_count = sum(nx.triangles(nx.to_undirected(nx_g)).values()) / 3
@@ -211,6 +212,28 @@ class Evaluator:
         self.gcn_evaluator = BaseEvaluator(
             partial(GCNTrainer, num_gnn_layers=2),
             f"{data_name}_cpts/gcn.pth",
+            num_classes,
+            train_mask=dgl_g_real.ndata["train_mask"],
+            val_mask=dgl_g_real.ndata["val_mask"],
+            test_mask=dgl_g_real.ndata["test_mask"],
+            A=A_real,
+            X=X_real,
+            Y=Y_real)
+
+        self.appnp_one_layer_evaluator = BaseEvaluator(
+            partial(APPNPTrainer, num_gnn_layers=1),
+            f"{data_name}_cpts/appnp_one_layer.pth",
+            num_classes,
+            train_mask=dgl_g_real.ndata["train_mask"],
+            val_mask=dgl_g_real.ndata["val_mask"],
+            test_mask=dgl_g_real.ndata["test_mask"],
+            A=A_real,
+            X=X_real,
+            Y=Y_real)
+
+        self.appnp_two_layer_evaluator = BaseEvaluator(
+            partial(APPNPTrainer, num_gnn_layers=2),
+            f"{data_name}_cpts/appnp_two_layer.pth",
             num_classes,
             train_mask=dgl_g_real.ndata["train_mask"],
             val_mask=dgl_g_real.ndata["val_mask"],
