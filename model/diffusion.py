@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from .gnn import *
 
@@ -458,13 +459,8 @@ class ModelSync(BaseModel):
             # Sample a timestep t uniformly.
             # Note that the notation is slightly inconsistent with the paper.
             # t=0 corresponds to t=1 in the paper, where corruption has already taken place.
-            if self.training:
-                t = torch.randint(low=0, high=self.T + 1, size=(1,),
-                                  device=X_one_hot_3d.device)
-            else:
-                # For evaluation, the loss for t=0 is computed separately.
-                t = torch.randint(low=1, high=self.T + 1, size=(1,),
-                                  device=X_one_hot_3d.device)
+            t = torch.randint(low=0, high=self.T + 1, size=(1,),
+                              device=X_one_hot_3d.device)
 
         alpha_bar_t = self.noise_schedule.alpha_bars[t]
 
@@ -708,3 +704,17 @@ class ModelSync(BaseModel):
         X_t_one_hot = self.sample_X(X_prior)
 
         # Iteratively sample p(D^s | D^t) for t = 1, ..., T, with s = t - 1.
+        for s in tqdm(list(reversed(range(0, self.T)))):
+            t = s + 1
+
+            # Note that computing Q_bar_t from alpha_bar_t is the same
+            # as computing Q_t from alpha_t.
+            alpha_t = self.noise_schedule.alphas[t]
+            alpha_bar_s = self.noise_schedule.alpha_bars[s]
+            alpha_bar_t = self.noise_schedule.alpha_bars[t]
+
+            Q_t_E = self.transition.get_Q_bar_E(alpha_t)
+            Q_bar_s_E = self.transition.get_Q_bar_E(alpha_bar_s)
+            Q_bar_t_E = self.transition.get_Q_bar_E(alpha_bar_t)
+
+            t_float = torch.tensor([t / self.T]).to(device)
