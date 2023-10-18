@@ -134,6 +134,64 @@ def get_adj(dgl_g):
 
     return A_norm
 
+def get_edge_split(A_dense):
+    # Exclude self-loops.
+    A_dense_upper = torch.triu(A_dense, diagonal=1)
+    real_edges = A_dense_upper.nonzero()
+
+    real_indices = torch.randperm(real_edges.size(0))
+    real_edges = real_edges[real_indices]
+
+    num_real = len(real_edges)
+    num_train = int(num_real * 0.8)
+    num_val = int(num_real * 0.1)
+    num_test = num_real - num_train - num_val
+
+    real_train, real_val, real_test = torch.split(
+        real_edges, [num_train, num_val, num_test])
+
+    neg_edges = torch.triu((A_dense == 0).float(), diagonal=1).nonzero()
+    neg_indices = torch.randperm(neg_edges.size(0))
+
+    neg_val = neg_edges[neg_indices[:num_val]]
+    neg_test = neg_edges[neg_indices[num_val:num_val+num_test]]
+
+    return real_train, real_val, real_test, neg_val, neg_test
+
+def prepare_for_GAE(A):
+    A_dense = A.to_dense()
+
+    real_train, real_val, real_test, neg_val, neg_test = get_edge_split(A_dense)
+
+    num_nodes = A_dense.size(0)
+    train_mask = torch.zeros(num_nodes, num_nodes)
+    val_mask = torch.zeros(num_nodes, num_nodes)
+    test_mask = torch.zeros(num_nodes, num_nodes)
+
+    edge_train = real_train
+    edge_val = torch.cat([real_val, neg_val], dim=0)
+    edge_test = torch.cat([real_test, neg_test], dim=0)
+
+    row_train, col_train = edge_train.T
+    train_mask[row_train, col_train] = 1.
+
+    row_val, col_val = edge_val.T
+    val_mask[row_val, col_val] = 1.
+
+    row_test, col_test = edge_test.T
+    test_mask[row_test, col_test] = 1.
+
+    train_mask = train_mask.bool()
+    val_mask = val_mask.bool()
+    test_mask = test_mask.bool()
+
+    real_row_train, real_col_train = real_train.T
+    train_g = dgl.graph((real_row_train, real_col_train), num_nodes=num_nodes)
+    train_g = dgl.to_bidirected(train_g)
+    A_train = get_adj(train_g)
+
+    return A_train, train_mask, val_mask, test_mask
+
 class Evaluator:
     def __init__(self,
                  data_name,
@@ -241,6 +299,11 @@ class Evaluator:
             A=A_real,
             X=X_real,
             Y=Y_real)
+
+        # Generate train/val/test mask for link prediction.
+        # Fix the raw graph split for reproducibility.
+        torch.manual_seed(0)
+        A_real_train, train_mask, val_mask, test_mask = prepare_for_GAE(A_real)
 
     def add_mask_cora(self, dgl_g, Y_one_hot):
         num_nodes = dgl_g.num_nodes()
