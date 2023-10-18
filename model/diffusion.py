@@ -706,3 +706,5 @@ class ModelSync(BaseModel):
         X_prior = self.X_marginal[:, None, :].expand(-1, Y_0.size(0), -1)
         # (|V|, 2F)
         X_t_one_hot = self.sample_X(X_prior)
+
+        # Iteratively sample p(D^s | D^t) for t = 1, ..., T, with s = t - 1.
