@@ -12,7 +12,7 @@ from functools import partial
 from string import ascii_uppercase, digits
 
 from model import BaseEvaluator, MLPTrainer, SGCTrainer, GCNTrainer,\
-    APPNPTrainer, GAETrainer
+    APPNPTrainer, GAETrainer, CNEvaluator
 
 def get_triangle_count(nx_g):
     triangle_count = sum(nx.triangles(nx.to_undirected(nx_g)).values()) / 3
@@ -328,6 +328,14 @@ class Evaluator:
             A_full=A_real,
             X=X_real,
             Y=Y_real)
+
+        self.cn_evaluator = CNEvaluator(
+            f"{data_name}_cpts/cn.pth",
+            A_train=A_real_train,
+            A_full=A_real,
+            val_mask=val_mask,
+            test_mask=test_mask
+        )
 
     def add_mask_cora(self, dgl_g, Y_one_hot):
         num_nodes = dgl_g.num_nodes()
