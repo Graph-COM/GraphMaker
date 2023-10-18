@@ -661,3 +661,7 @@ class ModelSync(BaseModel):
 
         return denoise_match_E, denoise_match_X,\
             log_p_0_E, log_p_0_X
+
+    @torch.no_grad()
+    def sample(self, batch_size=32768):
+        pass

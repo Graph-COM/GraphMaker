@@ -52,6 +52,9 @@ def main(args):
     # Set seed for better reproducibility.
     set_seed()
 
+    for _ in range(args.num_samples):
+        model.sample()
+
 if __name__ == '__main__':
     from argparse import ArgumentParser
 
