@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from torch.utils.data import DataLoader
+
 from .gnn import *
 
 __all__ = ["ModelSync"]
@@ -663,5 +665,44 @@ class ModelSync(BaseModel):
             log_p_0_E, log_p_0_X
 
     @torch.no_grad()
-    def sample(self, batch_size=32768):
-        pass
+    def sample(self, batch_size=32768, num_workers=4):
+        """Sample a graph.
+
+        Parameters
+        ----------
+        batch_size : int
+            Batch size for edge prediction.
+        num_workers : int
+            Number of subprocesses for data loading in edge prediction.
+
+        Returns
+        -------
+        """
+        device = self.X_marginal.device
+        dst, src = torch.triu_indices(self.num_nodes, self.num_nodes,
+                                      offset=1, device=device)
+        # (|E|)
+        self.dst = dst
+        # (|E|)
+        self.src = src
+        # (|E|, 2)
+        edge_index = torch.stack([dst, src], dim=1).to("cpu")
+        data_loader = DataLoader(edge_index, batch_size=batch_size,
+                                 num_workers=num_workers)
+
+        # Sample G_T from prior distribution.
+        # (|V|, C)
+        Y_prior = self.Y_marginal[None, :].expand(self.num_nodes, -1)
+        # (|V|)
+        Y_0 = Y_prior.multinomial(1).reshape(-1)
+
+        # (|V|, |V|, 2)
+        E_prior = self.E_marginal[None, None, :].expand(
+            self.num_nodes, self.num_nodes, -1)
+        # (|V|, |V|)
+        E_t = self.sample_E(E_prior)
+
+        # (F, |V|, 2)
+        X_prior = self.X_marginal[:, None, :].expand(-1, Y_0.size(0), -1)
+        # (|V|, 2F)
+        X_t_one_hot = self.sample_X(X_prior)
