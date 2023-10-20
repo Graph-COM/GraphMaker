@@ -348,6 +348,83 @@ class BaseModel(nn.Module):
                                     Q_bar_s_E,
                                     pred_E)
 
+    def posterior(self,
+                  Z_t,
+                  Q_t,
+                  Q_bar_s,
+                  Q_bar_t,
+                  prior):
+        """Compute the posterior distribution for time step s, i.e., t - 1.
+
+        Parameters
+        ----------
+        Z_t : torch.Tensor of shape (B, 2) or (F, |V|, 2)
+            One-hot encoding of the sampled data at timestep t.
+            B for batch size, C for number of classes, D for number
+            of features.
+        Q_t : torch.Tensor of shape (2, 2) or (F, 2, 2)
+            The transition matrix from timestep t-1 to t.
+        Q_bar_s : torch.Tensor of shape (2, 2) or (F, 2, 2)
+            The transition matrix from timestep 0 to t-1.
+        Q_bar_t : torch.Tensor of shape (2, 2) or (F, 2, 2)
+            The transition matrix from timestep 0 to t.
+        prior : torch.Tensor of shape (B, 2) or (F, |V|, 2)
+            Reconstructed prior distribution.
+
+        Returns
+        -------
+        prob : torch.Tensor of shape (B, 2) or (D, B, C)
+            Posterior distribution.
+        """
+        # (B, 2) or (F, |V|, 2)
+        left_term = Z_t @ torch.transpose(Q_t, -1, -2)
+        # (B, 1, 2) or (F, |V|, 1, 2)
+        left_term = left_term.unsqueeze(dim=-2)
+        # (1, 2, 2) or (F, 1, 2, 2)
+        right_term = Q_bar_s.unsqueeze(dim=-3)
+        # (B, 2, 2) or (F, |V|, 2, 2)
+        # Different from denoise_match_z, this function does not
+        # compute (Z_t @ Q_t.T) * (Z_0 @ Q_bar_s) for a specific
+        # Z_0, but compute for all possible values of Z_0.
+        numerator = left_term * right_term
+
+        # (2, B) or (F, 2, |V|)
+        prod = Q_bar_t @ torch.transpose(Z_t, -1, -2)
+        # (B, 2) or (F, |V|, 2)
+        prod = torch.transpose(prod, -1, -2)
+        # (B, 2, 1) or (F, |V|, 2, 1)
+        denominator = prod.unsqueeze(-1)
+        denominator[denominator == 0.] = 1.
+        # (B, 2, 2) or (F, |V|, 2, 2)
+        out = numerator / denominator
+
+        # (B, 2, 2) or (F, |V|, 2, 2)
+        prob = prior.unsqueeze(-1) * out
+        # (B, 2) or (F, |V|, C)
+        prob = prob.sum(dim=-2)
+
+        return prob
+
+    def sample_E_infer(self, prob_E):
+        """Draw a sample from prob_E
+
+        Parameters
+        ----------
+        prob_E : torch.Tensor of shape (B, 2)
+            Probability distributions for edge existence.
+
+        Returns
+        -------
+        E_t : torch.LongTensor of shape (|V|, |V|)
+            Sampled adjacency matrix.
+        """
+        E_t_ = prob_E.multinomial(1).squeeze(-1)
+        E_t = torch.zeros(self.num_nodes, self.num_nodes).long().to(E_t_.device)
+        E_t[self.dst, self.src] = E_t_
+        E_t[self.src, self.dst] = E_t_
+
+        return E_t
+
     def get_E_t(self,
                 device,
                 edge_data_loader,
@@ -360,12 +437,6 @@ class BaseModel(nn.Module):
                 Q_bar_s_E,
                 Q_bar_t_E,
                 batch_size):
-        """
-        Parameters
-        ----------
-        E_t : torch.LongTensor of shape (|V|, |V|)
-            Sampled symmetric adjacency matrix.
-        """
         A_t = self.get_adj(E_t)
         E_prob = torch.zeros(len(self.src), self.num_classes_E).to(device)
 
@@ -389,6 +460,16 @@ class BaseModel(nn.Module):
             batch_E_t_one_hot = F.one_hot(
                 E_t[batch_src, batch_dst],
                 num_classes=self.num_classes_E).float()
+            batch_E_prob_ = self.posterior(batch_E_t_one_hot, Q_t_E,
+                                           Q_bar_s_E, Q_bar_t_E, batch_pred_E)
+
+            end = start + batch_size
+            E_prob[start: end] = batch_E_prob_
+            start = end
+
+        E_t = self.sample_E_infer(E_prob)
+
+        return A_t, E_t
 
 class LossX(nn.Module):
     """
@@ -715,6 +796,12 @@ class ModelSync(BaseModel):
 
         Returns
         -------
+        X_t_one_hot : torch.Tensor of shape (F, |V|, 2)
+            One-hot encoding of the generated node attributes.
+        Y_0_one_hot : torch.Tensor of shape (|V|, C)
+            One-hot encoding of the generated node labels.
+        E_t : torch.LongTensor of shape (|V|, |V|)
+            Adjacency matrix of the generated graph.
         """
         device = self.X_marginal.device
         dst, src = torch.triu_indices(self.num_nodes, self.num_nodes,
@@ -741,7 +828,7 @@ class ModelSync(BaseModel):
         E_t = self.sample_E(E_prior)
 
         # (F, |V|, 2)
-        X_prior = self.X_marginal[:, None, :].expand(-1, Y_0.size(0), -1)
+        X_prior = self.X_marginal[:, None, :].expand(-1, self.num_nodes, -1)
         # (|V|, 2F)
         X_t_one_hot = self.sample_X(X_prior)
 
@@ -772,3 +859,36 @@ class ModelSync(BaseModel):
                                     Q_bar_s_E,
                                     Q_bar_t_E,
                                     batch_size)
+
+            # (|V|, F, 2)
+            pred_X = self.graph_encoder.pred_X(t_float,
+                                               X_t_one_hot,
+                                               Y_0,
+                                               A_t)
+            pred_X = pred_X.softmax(dim=-1)
+            # (F, |V|, 2)
+            pred_X = torch.transpose(pred_X, 0, 1)
+
+            # (|V|, F, 2)
+            X_t_one_hot = X_t_one_hot.reshape(self.num_nodes, self.num_attrs_X, -1)
+            # (F, |V|, 2)
+            X_t_one_hot = torch.transpose(X_t_one_hot, 0, 1)
+
+            # (F, |V|, 2)
+            Q_t_X = self.transition.get_Q_bar_X(alpha_t)
+            Q_bar_s_X = self.transition.get_Q_bar_X(alpha_bar_s)
+            Q_bar_t_X = self.transition.get_Q_bar_X(alpha_bar_t)
+
+            X_prob = self.posterior(X_t_one_hot, Q_t_X,
+                                    Q_bar_s_X, Q_bar_t_X, pred_X)
+            X_t_one_hot = self.sample_X(X_prob)
+            E_t = E_s
+
+        # (|V|, F, 2)
+        X_t_one_hot = X_t_one_hot.reshape(self.num_nodes, self.num_attrs_X, -1)
+        # (F, |V|, 2)
+        X_t_one_hot = torch.transpose(X_t_one_hot, 0, 1)
+
+        Y_0_one_hot = F.one_hot(Y_0, num_classes=self.num_classes_Y).float()
+
+        return X_t_one_hot, Y_0_one_hot, E_t

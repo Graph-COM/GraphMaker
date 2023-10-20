@@ -1,3 +1,4 @@
+import dgl
 import torch
 import torch.nn.functional as F
 
@@ -53,7 +54,9 @@ def main(args):
     set_seed()
 
     for _ in range(args.num_samples):
-        model.sample()
+        X_0_one_hot, Y_0_one_hot, E_0 = model.sample()
+        src, dst = E_0.nonzero().T
+        g_sample = dgl.graph((src, dst), num_nodes=num_nodes).cpu()
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
