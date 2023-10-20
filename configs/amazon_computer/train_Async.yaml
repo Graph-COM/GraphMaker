@@ -1,0 +1,44 @@
+meta_data :
+  variant: "Async" # Model name.
+
+mlp_X : # MLP for reconstructing node features.
+  hidden_t: 16 # Hidden size for the normalized time step.
+  hidden_X: 1024 # Hidden size for the node features.
+  hidden_Y: 64 # Hidden size for the node labels.
+  num_mlp_layers: 2 # Number of GNN layers.
+  dropout: 0. # Dropout rate.
+
+gnn_E : # GNN for reconstructing edges.
+  hidden_t: 16 # Hidden size for the normalized time step.
+  hidden_X: 512 # Hidden size for the node features.
+  hidden_Y: 64 # Hidden size for the node labels.
+  hidden_E: 128 # Hidden size for the edges.
+  num_gnn_layers: 2 # Number of GNN layers.
+  dropout: 0. # Dropout rate.
+
+diffusion :
+  T_X : 7 # Number of diffusion steps for node features.
+  T_E : 9 # Number of diffusion steps for edges.
+
+optimizer_X :
+  lr : 0.001 # Learning rate.
+  weight_decay : 0 # Weight decay.
+  amsgrad : true
+
+optimizer_E :
+  lr : 0.0003 # Learning rate.
+  weight_decay : 0 # Weight decay.
+  amsgrad : true
+
+lr_scheduler :
+  factor : 0.9 # Factor by which the learning rate will be reduced.
+  patience : 3 # Number of epochs with no improvement after which learning rate will be reduced.
+  verbose : true
+
+train :
+  num_epochs : 10000 # Number of training epochs.
+  val_every_epochs : 5 # Frequency of performing validation.
+  patient_epochs : 15 # Patience for early stop.
+  max_grad_norm : 10 # Maximal grad norm.
+  batch_size : 2097152 # Batch size for edge prediction.
+  val_batch_size : 4194304 # Batch size for validation.
