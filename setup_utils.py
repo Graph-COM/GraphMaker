@@ -57,8 +57,26 @@ class SyncYaml(pydantic.BaseModel):
     lr_scheduler: LRSchedulerYaml
     train: TrainYaml
 
+class MLPXYaml(pydantic.BaseModel):
+    hidden_t: int
+    hidden_X: int
+    hidden_Y: int
+    num_mlp_layers: int
+    dropout: float
+
+class DiffusionAsyncYaml(pydantic.BaseModel):
+    T_X: int
+    T_E: int
+
 class AsyncYaml(pydantic.BaseModel):
     meta_data: MetaDataYaml
+    mlp_X: MLPXYaml
+    gnn_E: GNNEYaml
+    diffusion: DiffusionAsyncYaml
+    optimizer_X: OptimizerYaml
+    optimizer_E: OptimizerYaml
+    lr_scheduler: LRSchedulerYaml
+    train: TrainYaml
 
 def load_train_yaml(data_name, model_name):
     with open(f"configs/{data_name}/train_{model_name}.yaml") as f:
