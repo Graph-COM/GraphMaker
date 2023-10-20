@@ -57,12 +57,17 @@ class SyncYaml(pydantic.BaseModel):
     lr_scheduler: LRSchedulerYaml
     train: TrainYaml
 
+class AsyncYaml(pydantic.BaseModel):
+    meta_data: MetaDataYaml
+
 def load_train_yaml(data_name, model_name):
     with open(f"configs/{data_name}/train_{model_name}.yaml") as f:
         yaml_data = yaml.load(f, Loader=yaml.loader.SafeLoader)
 
     if model_name == "Sync":
         return SyncYaml(**yaml_data).model_dump()
+    elif model_name == "Async":
+        return AsyncYaml(**yaml_data).model_dump()
 
 def set_seed(seed=0):
     np.random.seed(seed)
