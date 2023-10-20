@@ -36,9 +36,12 @@ g++ -O2 -std=c++11 -o orca orca.cpp
 ### Train
 
 ```bash
-# GraphMaker-Sync simultaneously generates node attributes and graph structure.
+# The GraphMaker-Sync variant simultaneously generates node attributes and graph structure.
 python train_sync.py -d D
 # The trained model checkpoint will be saved to {D}_cpts/Sync_XXX.pth
+
+# The GraphMaker-Async variant first generates node attributes, and then generates graph structure.
+python train_async.py -d D
 ```
 
 `D` can be one of the four built-in datasets, including `cora`, `citeseer`, `amazon_photo`, `amazon_computer`.
