@@ -348,6 +348,48 @@ class BaseModel(nn.Module):
                                     Q_bar_s_E,
                                     pred_E)
 
+    def get_E_t(self,
+                device,
+                edge_data_loader,
+                pred_E_func,
+                t_float,
+                X_t_one_hot,
+                Y_0,
+                E_t,
+                Q_t_E,
+                Q_bar_s_E,
+                Q_bar_t_E,
+                batch_size):
+        """
+        Parameters
+        ----------
+        E_t : torch.LongTensor of shape (|V|, |V|)
+            Sampled symmetric adjacency matrix.
+        """
+        A_t = self.get_adj(E_t)
+        E_prob = torch.zeros(len(self.src), self.num_classes_E).to(device)
+
+        start = 0
+        for batch_edge_index in edge_data_loader:
+            # (B, 2)
+            batch_edge_index = batch_edge_index.to(device)
+            batch_dst, batch_src = batch_edge_index.T
+            # Reconstruct the edges.
+            # (B, 2)
+            batch_pred_E = pred_E_func(t_float,
+                                       X_t_one_hot,
+                                       Y_0,
+                                       A_t,
+                                       batch_src,
+                                       batch_dst)
+
+            batch_pred_E = batch_pred_E.softmax(dim=-1)
+
+            # (B, 2)
+            batch_E_t_one_hot = F.one_hot(
+                E_t[batch_src, batch_dst],
+                num_classes=self.num_classes_E).float()
+
 class LossX(nn.Module):
     """
     Parameters
@@ -718,3 +760,15 @@ class ModelSync(BaseModel):
             Q_bar_t_E = self.transition.get_Q_bar_E(alpha_bar_t)
 
             t_float = torch.tensor([t / self.T]).to(device)
+
+            A_t, E_s = self.get_E_t(device,
+                                    data_loader,
+                                    self.graph_encoder.pred_E,
+                                    t_float,
+                                    X_t_one_hot,
+                                    Y_0,
+                                    E_t,
+                                    Q_t_E,
+                                    Q_bar_s_E,
+                                    Q_bar_t_E,
+                                    batch_size)
