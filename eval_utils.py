@@ -9,6 +9,8 @@ import subprocess as sp
 import torch
 
 from functools import partial
+from pprint import pprint
+from scipy import stats
 from string import ascii_uppercase, digits
 
 from model import BaseEvaluator, MLPTrainer, SGCTrainer, GCNTrainer,\
@@ -191,6 +193,90 @@ def prepare_for_GAE(A):
     A_train = get_adj(train_g)
 
     return A_train, train_mask, val_mask, test_mask
+
+def emd(p, q):
+    return (
+        torch.cumsum(p, dim=0) - torch.cumsum(q, dim=0)
+    ).abs().sum().item()
+
+def get_pairwise_emd(real_dists, sample_dists):
+    emd_list = []
+    for p in real_dists:
+        for q in sample_dists:
+            emd_list.append(emd(p, q))
+    return float(np.mean(emd_list))
+
+def get_deg_emd(real_degs, sample_degs):
+    """Compute the earth mover distance (EMD) between
+    two degree distributions.
+
+    Parameters
+    ----------
+    real_degs : list of torch.Tensor of shape (|V1|)
+        Node degrees of the real graphs.
+    sample_degs : list of torch.Tensor of shape (|V2|)
+        Node degrees of the sampled graphs.
+
+    Returns
+    -------
+    emd
+        The EMD value.
+    """
+    max_deg = max(
+        max([deg.max().item() for deg in real_degs]),
+        max([deg.max().item() for deg in sample_degs])
+    )
+
+    def get_degree_dist(deg):
+        num_nodes = deg.size(0)
+        freq = torch.zeros(num_nodes, max_deg + 1)
+        freq[torch.arange(num_nodes), deg] = 1.
+        freq = freq.sum(dim=0)
+        return freq / (freq.sum() + 1e-6)
+
+    real_dists = []
+    for deg in real_degs:
+        real_dists.append(get_degree_dist(deg))
+
+    sample_dists = []
+    for deg in sample_degs:
+        sample_dists.append(get_degree_dist(deg))
+
+    return get_pairwise_emd(real_dists, sample_dists)
+
+def get_cluster_emd(real_vals, sample_vals, bins=100):
+    """Compute the earth mover distance (EMD) between
+    two clustering coefficient distributions.
+
+    Parameters
+    ----------
+    real_vals : list of list of length (|V1|)
+        Node clustering coefficients of the real graphs.
+    sample_vals : list of list of length (|V2|)
+        Node clustering coefficients of the sampled graphs.
+    bins : int
+        Number of equal-width bins in the given range.
+
+    Returns
+    -------
+    emd
+        The EMD value.
+    """
+    def get_cluster_dist(vals):
+        hist, _ = np.histogram(
+            vals, bins=bins, range=(0.0, 1.0), density=False)
+        hist = torch.from_numpy(hist)
+        return hist / (hist.sum() + 1e-6)
+
+    real_dists = []
+    for vals in real_vals:
+        real_dists.append(get_cluster_dist(vals))
+
+    sample_dists = []
+    for vals in sample_vals:
+        sample_dists.append(get_cluster_dist(vals))
+
+    return get_pairwise_emd(real_dists, sample_dists)
 
 class Evaluator:
     def __init__(self,
@@ -557,3 +643,185 @@ class Evaluator:
         }
 
         return dgl_g, X, Y, data_dict
+
+    def add_sample(self,
+                   dgl_g,
+                   X_one_hot_3d,
+                   Y_one_hot):
+        """Add a generated sample for evaluation.
+
+        Parameters
+        ----------
+        dgl_g : dgl.DGLGraph
+            Generated graph.
+        X_one_hot_3d : torch.Tensor of shape (F, |V|, 2)
+            X_one_hot_3d[f, :, :] is the one-hot encoding of the f-th node
+            attribute in the generated graph.
+        Y_one_hot : torch.Tensor of shape (|V|, C)
+            One-hot encoding of the node label in the generated graph.
+        """
+        dgl_g_sample, X_sample, Y_sample, data_dict_sample = self.preprocess_g(
+            dgl_g,
+            X_one_hot_3d,
+            Y_one_hot,
+            add_mask=True)
+
+        self.data_dict_sample_list.append(data_dict_sample)
+
+        self.mlp_evaluator.add_sample(
+            X=X_sample,
+            Y=Y_sample,
+            train_mask=dgl_g_sample.ndata["train_mask"],
+            val_mask=dgl_g_sample.ndata["val_mask"],
+            test_mask=dgl_g_sample.ndata["test_mask"])
+
+        A_sample = get_adj(dgl_g_sample)
+
+        self.sgc_one_layer_evaluator.add_sample(
+            A=A_sample,
+            X=X_sample,
+            Y=Y_sample,
+            train_mask=dgl_g_sample.ndata["train_mask"],
+            val_mask=dgl_g_sample.ndata["val_mask"],
+            test_mask=dgl_g_sample.ndata["test_mask"])
+
+        self.sgc_two_layer_evaluator.add_sample(
+            A=A_sample,
+            X=X_sample,
+            Y=Y_sample,
+            train_mask=dgl_g_sample.ndata["train_mask"],
+            val_mask=dgl_g_sample.ndata["val_mask"],
+            test_mask=dgl_g_sample.ndata["test_mask"])
+
+        self.gcn_evaluator.add_sample(
+            A=A_sample,
+            X=X_sample,
+            Y=Y_sample,
+            train_mask=dgl_g_sample.ndata["train_mask"],
+            val_mask=dgl_g_sample.ndata["val_mask"],
+            test_mask=dgl_g_sample.ndata["test_mask"])
+
+        self.appnp_one_layer_evaluator.add_sample(
+            A=A_sample,
+            X=X_sample,
+            Y=Y_sample,
+            train_mask=dgl_g_sample.ndata["train_mask"],
+            val_mask=dgl_g_sample.ndata["val_mask"],
+            test_mask=dgl_g_sample.ndata["test_mask"])
+
+        self.appnp_two_layer_evaluator.add_sample(
+            A=A_sample,
+            X=X_sample,
+            Y=Y_sample,
+            train_mask=dgl_g_sample.ndata["train_mask"],
+            val_mask=dgl_g_sample.ndata["val_mask"],
+            test_mask=dgl_g_sample.ndata["test_mask"])
+
+        # Generate train/val/test mask.
+        A_sample_train, train_mask, val_mask, test_mask = prepare_for_GAE(A_sample)
+
+        self.gae_one_layer_evaluator.add_sample(
+            A_train=A_sample_train,
+            A_full=A_sample,
+            X=X_sample,
+            Y=Y_sample,
+            train_mask=train_mask,
+            val_mask=val_mask,
+            test_mask=test_mask)
+
+        self.gae_two_layer_evaluator.add_sample(
+            A_train=A_sample_train,
+            A_full=A_sample,
+            X=X_sample,
+            Y=Y_sample,
+            train_mask=train_mask,
+            val_mask=val_mask,
+            test_mask=test_mask)
+
+        self.cn_evaluator.add_sample(
+            A_train=A_sample_train,
+            A_full=A_sample,
+            val_mask=val_mask,
+            test_mask=test_mask
+        )
+
+    def summary(self):
+        report = dict()
+
+        for key in ["triangle_count", "linkx_A", "linkx_A_pow_2"]:
+            avg_stats_sample = np.mean([
+                data_dict_sample[key] for data_dict_sample in self.data_dict_sample_list
+            ])
+            report[key] = avg_stats_sample / self.data_dict_real[key]
+
+        report["deg_emd"] = get_deg_emd(
+            [self.data_dict_real["degs"]],
+            [data_dict_sample["degs"] for data_dict_sample in self.data_dict_sample_list])
+
+        # clustering coefficient EMD
+        report["cluster_emd"] = get_cluster_emd(
+            [self.data_dict_real["cluster_coefs"]],
+            [data_dict_sample["cluster_coefs"]
+             for data_dict_sample in self.data_dict_sample_list]
+        )
+
+        report["orbit_emd"] = get_pairwise_emd(
+            [self.data_dict_real["orbit_dist"]],
+            [data_dict_sample["orbit_dist"]
+             for data_dict_sample in self.data_dict_sample_list]
+        )
+
+        print('\n')
+        pprint(report)
+
+        print('\nMLP discriminator')
+        self.mlp_evaluator.summary()
+
+        print('\nSGC 1-layer discriminator')
+        self.sgc_one_layer_evaluator.summary()
+
+        print('\nSGC 2-layer discriminator')
+        self.sgc_two_layer_evaluator.summary()
+
+        print('\nGCN discriminator')
+        self.gcn_evaluator.summary()
+
+        print('\nAPPNP 1-layer discriminator')
+        self.appnp_one_layer_evaluator.summary()
+
+        print('\nAPPNP 2-layer discriminator')
+        self.appnp_two_layer_evaluator.summary()
+
+        print('\nGAE 1-layer discriminator')
+        self.gae_one_layer_evaluator.summary()
+
+        print('\nGAE 2-layer discriminator')
+        self.gae_two_layer_evaluator.summary()
+
+        print('\nCN discriminator')
+        self.cn_evaluator.summary()
+
+        real_acc_vector = [
+            self.mlp_evaluator.real_real_acc,
+            self.sgc_one_layer_evaluator.real_real_acc,
+            self.sgc_two_layer_evaluator.real_real_acc,
+            self.gcn_evaluator.real_real_acc,
+            self.appnp_one_layer_evaluator.real_real_acc,
+            self.appnp_two_layer_evaluator.real_real_acc
+        ]
+        pearson_coeff = []
+        spearman_coeff = []
+        for i in range(len(self.data_dict_sample_list)):
+            sample_acc_vector = [
+                self.mlp_evaluator.sample_sample_acc[i],
+                self.sgc_one_layer_evaluator.sample_sample_acc[i],
+                self.sgc_two_layer_evaluator.sample_sample_acc[i],
+                self.gcn_evaluator.sample_sample_acc[i],
+                self.appnp_one_layer_evaluator.sample_sample_acc[i],
+                self.appnp_two_layer_evaluator.sample_sample_acc[i]
+            ]
+            pearson_coeff.append(stats.pearsonr(real_acc_vector, sample_acc_vector).statistic)
+            spearman_coeff.append(stats.spearmanr(real_acc_vector, sample_acc_vector).statistic)
+
+        print(f'\nPearson correlation coefficient: {np.mean(pearson_coeff)}')
+        print(f'\nSpearman correlation coefficient: {np.mean(spearman_coeff)}')

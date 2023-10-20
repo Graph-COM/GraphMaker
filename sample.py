@@ -58,6 +58,12 @@ def main(args):
         src, dst = E_0.nonzero().T
         g_sample = dgl.graph((src, dst), num_nodes=num_nodes).cpu()
 
+        evaluator.add_sample(g_sample,
+                             X_0_one_hot.cpu(),
+                             Y_0_one_hot.cpu())
+
+    evaluator.summary()
+
 if __name__ == '__main__':
     from argparse import ArgumentParser
 
