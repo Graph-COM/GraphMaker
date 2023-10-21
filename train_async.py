@@ -5,6 +5,7 @@ import wandb
 from torch.utils.data import DataLoader
 
 from data import load_dataset, preprocess
+from model import ModelAsync
 from setup_utils import load_train_yaml, set_seed
 
 def main(args):
@@ -54,6 +55,14 @@ def main(args):
                              shuffle=True, num_workers=4)
     val_data_loader = DataLoader(edge_index, batch_size=train_config["val_batch_size"],
                                  shuffle=False)
+
+    model = ModelAsync(X_marginal=X_marginal,
+                       Y_marginal=Y_marginal,
+                       E_marginal=E_marginal,
+                       num_nodes=N,
+                       mlp_X_config=yaml_data["mlp_X"],
+                       gnn_E_config=yaml_data["gnn_E"],
+                       **yaml_data["diffusion"]).to(device)
 
 if __name__ == '__main__':
     from argparse import ArgumentParser

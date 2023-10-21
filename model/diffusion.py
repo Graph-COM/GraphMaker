@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from .gnn import *
 
-__all__ = ["ModelSync"]
+__all__ = ["ModelSync", "ModelAsync"]
 
 class MarginalTransition(nn.Module):
     """
@@ -892,3 +892,23 @@ class ModelSync(BaseModel):
         Y_0_one_hot = F.one_hot(Y_0, num_classes=self.num_classes_Y).float()
 
         return X_t_one_hot, Y_0_one_hot, E_t
+
+class ModelAsync(BaseModel):
+    """
+    Parameters
+    ----------
+    """
+    def __init__(self,
+                 T_X,
+                 T_E,
+                 X_marginal,
+                 Y_marginal,
+                 E_marginal,
+                 mlp_X_config,
+                 gnn_E_config,
+                 num_nodes):
+        super().__init__(T=T_X,
+                         X_marginal=X_marginal,
+                         Y_marginal=Y_marginal,
+                         E_marginal=E_marginal,
+                         num_nodes=num_nodes)
