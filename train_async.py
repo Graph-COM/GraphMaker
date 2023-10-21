@@ -96,6 +96,18 @@ def main(args):
     for epoch in range(train_config["num_epochs"]):
         model.train()
 
+        for batch_edge_index in tqdm(data_loader):
+            batch_edge_index = batch_edge_index.to(device)
+            # (B), (B)
+            batch_dst, batch_src = batch_edge_index.T
+            loss_X, loss_E = model.log_p_t(X_one_hot_3d,
+                                           E_one_hot,
+                                           Y,
+                                           X_one_hot_2d,
+                                           batch_src,
+                                           batch_dst,
+                                           E_one_hot[batch_dst, batch_src])
+
 if __name__ == '__main__':
     from argparse import ArgumentParser
 

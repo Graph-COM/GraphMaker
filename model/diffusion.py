@@ -610,21 +610,22 @@ class ModelSync(BaseModel):
                 batch_dst,
                 batch_E_one_hot,
                 t=None):
-        """Obtain G and compute log p(G | G^t, Y, t).
+        """Obtain G^t and compute log p(G | G^t, Y, t).
 
         Parameters
         ----------
         X_one_hot_3d : torch.Tensor of shape (F, |V|, 2)
-            X_one_hot_3d[f, :, :] is the one-hot encoding of the f-th node attribute.
+            X_one_hot_3d[f, :, :] is the one-hot encoding of the f-th node attribute
+            in the real graph.
         E_one_hot : torch.Tensor of shape (|V|, |V|, 2)
-            - E_one_hot[:, :, 0] indicates the absence of an edge.
-            - E_one_hot[:, :, 1] is the original adjacency matrix.
+            - E_one_hot[:, :, 0] indicates the absence of an edge in the real graph.
+            - E_one_hot[:, :, 1] is the adjacency matrix of the real graph.
         Y : torch.Tensor of shape (|V|)
-            Categorical node labels.
+            Categorical node labels of the real graph.
         batch_src : torch.LongTensor of shape (B)
-            Source node IDs for a batch of edges (node pairs).
+            Source node IDs for a batch of candidate edges (node pairs).
         batch_dst : torch.LongTensor of shape (B)
-            Destination node IDs for a batch of edges (node pairs).
+            Destination node IDs for a batch of candidate edges (node pairs).
         batch_E_one_hot : torch.Tensor of shape (B, 2)
             E_one_hot[batch_dst, batch_src].
         t : torch.LongTensor of shape (1), optional
@@ -947,3 +948,48 @@ class ModelAsync(BaseModel):
                                       gnn_E_config=gnn_E_config)
 
         self.loss_X = LossX(self.num_attrs_X, self.num_classes_X)
+
+    def log_p_t(self,
+                X_one_hot_3d,
+                E_one_hot,
+                Y,
+                X_one_hot_2d,
+                batch_src,
+                batch_dst,
+                batch_E_one_hot,
+                t_X=None,
+                t_E=None):
+        """Obtain G^t and compute log p(G | G^t, Y, t).
+
+        Parameters
+        ----------
+        X_one_hot_3d : torch.Tensor of shape (F, |V|, 2)
+            X_one_hot_3d[f, :, :] is the one-hot encoding of the f-th node attribute
+            in the real graph.
+        E_one_hot : torch.Tensor of shape (|V|, |V|, 2)
+            - E_one_hot[:, :, 0] indicates the absence of an edge in the real graph.
+            - E_one_hot[:, :, 1] is the adjacency matrix of the real graph.
+        Y : torch.Tensor of shape (|V|)
+            Categorical node labels of the real graph.
+        X_one_hot_2d : torch.Tensor of shape (|V|, 2 * F)
+            Flattened one-hot encoding of the node attributes in the real graph.
+        batch_src : torch.LongTensor of shape (B)
+            Source node IDs for a batch of candidate edges (node pairs).
+        batch_dst : torch.LongTensor of shape (B)
+            Destination node IDs for a batch of candidate edges (node pairs).
+        batch_E_one_hot : torch.Tensor of shape (B, 2)
+            E_one_hot[batch_dst, batch_src].
+        t_X : torch.LongTensor of shape (1), optional
+            If specified, a time step will be enforced rather than sampled for
+            node attributes.
+        t_E : torch.LongTensor of shape (1), optional
+            If specified, a time step will be enforced rather than sampled for
+            edges.
+
+        Returns
+        -------
+        loss_X : torch.Tensor
+            Scalar representing the loss for node attributes.
+        loss_E : torch.Tensor
+            Scalar representing the loss for edge existence.
+        """
