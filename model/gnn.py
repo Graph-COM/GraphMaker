@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-__all__ = ["GNN", "LinkPredictor"]
+__all__ = ["GNN", "LinkPredictor", "GNNAsymm"]
 
 class GNNLayer(nn.Module):
     """Graph Neural Network (GNN) / Message Passing Neural Network (MPNN) Layer.
@@ -332,3 +332,30 @@ class GNN(nn.Module):
                               batch_dst)
 
         return logit_X, logit_E
+
+class GNNAsymm(nn.Module):
+    """P(X|Y, X_t) + P(A|Y, X, A_t)
+
+    Parameters
+    ----------
+    num_attrs_X : int
+        Number of node attributes.
+    num_classes_X : int
+        Number of classes for each node attribute.
+    num_classes_Y : int
+        Number of classes for node label.
+    num_classes_E : int
+        Number of edge classes.
+    mlp_X_config : dict
+        Configuration of the MLP for reconstructing node attributes.
+    gnn_E_config : dict
+        Configuration of the GNN for reconstructing edges.
+    """
+    def __init__(self,
+                 num_attrs_X,
+                 num_classes_X,
+                 num_classes_Y,
+                 num_classes_E,
+                 mlp_X_config,
+                 gnn_E_config):
+        super().__init__()

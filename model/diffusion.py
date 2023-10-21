@@ -938,3 +938,12 @@ class ModelAsync(BaseModel):
         device = X_marginal.device
         self.noise_schedule_X = NoiseSchedule(T_X, device)
         self.noise_schedule_E = NoiseSchedule(T_E, device)
+
+        self.graph_encoder = GNNAsymm(num_attrs_X=self.num_attrs_X,
+                                      num_classes_X=self.num_classes_X,
+                                      num_classes_Y=self.num_classes_Y,
+                                      num_classes_E=self.num_classes_E,
+                                      mlp_X_config=mlp_X_config,
+                                      gnn_E_config=gnn_E_config)
+
+        self.loss_X = LossX(self.num_attrs_X, self.num_classes_X)
