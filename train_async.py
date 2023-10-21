@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import torch
+import torch.nn as nn
 import wandb
 
 from copy import deepcopy
@@ -107,6 +108,23 @@ def main(args):
                                            batch_src,
                                            batch_dst,
                                            E_one_hot[batch_dst, batch_src])
+            loss = loss_X + loss_E
+
+            optimizer_X.zero_grad()
+            optimizer_E.zero_grad()
+
+            loss.backward()
+
+            nn.utils.clip_grad_norm_(
+                model.graph_encoder.pred_X.parameters(), train_config["max_grad_norm"])
+            nn.utils.clip_grad_norm_(
+                model.graph_encoder.pred_E.parameters(), train_config["max_grad_norm"])
+
+            optimizer_X.step()
+            optimizer_E.step()
+
+            wandb.log({"train/loss_X": loss_X.item(),
+                       "train/loss_E": loss_E.item()})
 
 if __name__ == '__main__':
     from argparse import ArgumentParser

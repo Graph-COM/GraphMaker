@@ -734,6 +734,14 @@ class ModelSync(BaseModel):
 
         Returns
         -------
+        denoise_match_E : float
+            Denoising matching term for edge.
+        denoise_match_X : float
+            Denoising matching term for node attributes.
+        log_p_0_E : float
+            Reconstruction term for edge.
+        log_p_0_X : float
+            Reconstruction term for node attributes.
         """
         device = E_one_hot.device
 
@@ -1070,3 +1078,16 @@ class ModelAsync(BaseModel):
         t_float_X, X_t_one_hot = self.apply_noise_X(X_one_hot_3d, t_X)
         t_float_E, E_t = self.apply_noise_E(E_one_hot, t_E)
         A_t = self.get_adj(E_t)
+        logit_X, logit_E = self.graph_encoder(t_float_X,
+                                              t_float_E,
+                                              X_t_one_hot,
+                                              Y,
+                                              X_one_hot_2d,
+                                              A_t,
+                                              batch_src,
+                                              batch_dst)
+
+        loss_X = self.loss_X(X_one_hot_3d, logit_X)
+        loss_E = self.loss_E(batch_E_one_hot, logit_E)
+
+        return loss_X, loss_E

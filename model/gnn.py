@@ -308,9 +308,9 @@ class GNN(nn.Module):
         A_t : dglsp.SparseMatrix
             Row-normalized sampled adjacency matrix.
         batch_src : torch.LongTensor of shape (B)
-            Source node IDs for a batch of edges (node pairs).
+            Source node IDs for a batch of candidate edges (node pairs).
         batch_dst : torch.LongTensor of shape (B)
-            Destination node IDs for a batch of edges (node pairs).
+            Destination node IDs for a batch of candidate edges (node pairs).
 
         Returns
         -------
@@ -499,3 +499,52 @@ class GNNAsymm(nn.Module):
                                     num_classes_Y,
                                     num_classes_E,
                                     **gnn_E_config)
+
+    def forward(self,
+                t_float_X,
+                t_float_E,
+                X_t_one_hot,
+                Y,
+                X_one_hot_2d,
+                A_t,
+                batch_src,
+                batch_dst):
+        """
+        Parameters
+        ----------
+        t_float_X : torch.Tensor of shape (1)
+            Sampled timestep divided by self.T_X.
+        t_float_E : torch.Tensor of shape (1)
+            Sampled timestep divided by self.T_E.
+        X_t_one_hot : torch.Tensor of shape (|V|, 2 * F)
+            One-hot encoding of the sampled node attributes.
+        Y : torch.Tensor of shape (|V|)
+            Categorical node labels.
+        X_one_hot_2d : torch.Tensor of shape (|V|, 2 * F)
+            Flattened one-hot encoding of the node attributes.
+        A_t : dglsp.SparseMatrix
+            Row-normalized sampled adjacency matrix.
+        batch_src : torch.LongTensor of shape (B)
+            Source node IDs for a batch of candidate edges (node pairs).
+        batch_dst : torch.LongTensor of shape (B)
+            Destination node IDs for a batch of candidate edges (node pairs).
+
+        Returns
+        -------
+        logit_X : torch.Tensor of shape (|V|, F, 2)
+            Predicted logits for the node attributes.
+        logit_E : torch.Tensor of shape (B, 2)
+            Predicted logits for the edge existence.
+        """
+        logit_X = self.pred_X(t_float_X,
+                              X_t_one_hot,
+                              Y)
+
+        logit_E = self.pred_E(t_float_E,
+                              X_one_hot_2d,
+                              Y,
+                              A_t,
+                              batch_src,
+                              batch_dst)
+
+        return logit_X, logit_E
