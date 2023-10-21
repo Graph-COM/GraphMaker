@@ -126,6 +126,20 @@ def main(args):
             wandb.log({"train/loss_X": loss_X.item(),
                        "train/loss_E": loss_E.item()})
 
+        if (epoch + 1) % train_config["val_every_epochs"] != 0:
+            continue
+
+        model.eval()
+
+        num_patient_epochs += 1
+        denoise_match_X = []
+        denoise_match_E = []
+        log_p_0_X = []
+        log_p_0_E = []
+        for batch_edge_index in tqdm(val_data_loader):
+            # (B), (B)
+            batch_dst, batch_src = batch_edge_index.T
+
 if __name__ == '__main__':
     from argparse import ArgumentParser
 

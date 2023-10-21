@@ -719,16 +719,17 @@ class ModelSync(BaseModel):
         Parameters
         ----------
         X_one_hot_3d : torch.Tensor of shape (F, |V|, 2)
-            X_one_hot_3d[f, :, :] is the one-hot encoding of the f-th node attribute.
+            X_one_hot_3d[f, :, :] is the one-hot encoding of the f-th node attribute
+            in the real graph.
         E_one_hot : torch.Tensor of shape (|V|, |V|, 2)
-            - E_one_hot[:, :, 0] indicates the absence of an edge.
-            - E_one_hot[:, :, 1] is the original adjacency matrix.
+            - E_one_hot[:, :, 0] indicates the absence of an edge in the real graph.
+            - E_one_hot[:, :, 1] is the adjacency matrix of the real graph.
         Y : torch.Tensor of shape (|V|)
-            Categorical node labels.
+            Categorical node labels of the real graph.
         batch_src : torch.LongTensor of shape (B)
-            Source node IDs for a batch of edges (node pairs).
+            Source node IDs for a batch of candidate edges (node pairs).
         batch_dst : torch.LongTensor of shape (B)
-            Destination node IDs for a batch of edges (node pairs).
+            Destination node IDs for a batch of candidate edges (node pairs).
         batch_E_one_hot : torch.Tensor of shape (B, 2)
             E_one_hot[batch_dst, batch_src].
 
@@ -1091,3 +1092,202 @@ class ModelAsync(BaseModel):
         loss_E = self.loss_E(batch_E_one_hot, logit_E)
 
         return loss_X, loss_E
+
+    def denoise_match_X(self,
+                        t_float,
+                        logit_X,
+                        X_t_one_hot,
+                        X_one_hot_3d):
+        """Compute the denoising match term for node attribute prediction given a
+        sampled t, i.e., the KL divergence between q(D^{t-1}| D, D^t) and
+        q(D^{t-1}| hat{p}^{D}, D^t).
+
+        Parameters
+        ----------
+        t_float : torch.Tensor of shape (1)
+            Sampled timestep divided by self.T_X.
+        logit_X : torch.Tensor of shape (|V|, F, 2)
+            Predicted logits for the node attributes.
+        X_t_one_hot : torch.Tensor of shape (|V|, 2 * F)
+            One-hot encoding of the node attributes sampled at time step t.
+        X_one_hot_3d : torch.Tensor of shape (F, |V|, 2)
+            X_one_hot_3d[f, :, :] is the one-hot encoding of the f-th node attribute.
+
+        Returns
+        -------
+        float
+            KL value for node attributes.
+        """
+        t = int(t_float.item() * self.T_X)
+        s = t - 1
+
+        alpha_bar_s = self.noise_schedule_X.alpha_bars[s]
+        alpha_t = self.noise_schedule_X.alphas[t]
+
+        Q_bar_s_X = self.transition.get_Q_bar_X(alpha_bar_s)
+        # Note that computing Q_bar_t from alpha_bar_t is the same
+        # as computing Q_t from alpha_t.
+        Q_t_X = self.transition.get_Q_bar_X(alpha_t)
+
+        # (|V|, F, 2)
+        pred_X = logit_X.softmax(dim=-1)
+        # (F, |V|, 2)
+        pred_X = torch.transpose(pred_X, 0, 1)
+
+        num_nodes = X_t_one_hot.size(0)
+        # (|V|, F, 2)
+        X_t_one_hot = X_t_one_hot.reshape(num_nodes, self.num_attrs_X, -1)
+        # (F, |V|, 2)
+        X_t_one_hot = torch.transpose(X_t_one_hot, 0, 1)
+
+        return self.denoise_match_Z(X_t_one_hot,
+                                    Q_t_X,
+                                    X_one_hot_3d,
+                                    Q_bar_s_X,
+                                    pred_X)
+
+    def denoise_match_E(self,
+                        t_float,
+                        logit_E,
+                        E_t_one_hot,
+                        E_one_hot):
+        """Compute the denoising match term for edge prediction given a
+        sampled t, i.e., the KL divergence between q(D^{t-1}| D, D^t) and
+        q(D^{t-1}| hat{p}^{D}, D^t).
+
+        Parameters
+        ----------
+        t_float : torch.Tensor of shape (1)
+            Sampled timestep divided by self.T_E.
+        logit_E : torch.Tensor of shape (B, 2)
+            Predicted logits for the edge existence of a batch of node pairs.
+        E_t_one_hot : torch.Tensor of shape (B, 2)
+            One-hot encoding of sampled edge existence for the batch of
+            node pairs.
+        E_one_hot : torch.Tensor of shape (B, 2)
+            One-hot encoding of the original edge existence for the batch of
+            node pairs.
+
+        Returns
+        -------
+        float
+            KL value for edges.
+        """
+        t = int(t_float.item() * self.T_E)
+        s = t - 1
+
+        alpha_bar_s = self.noise_schedule_E.alpha_bars[s]
+        alpha_t = self.noise_schedule_E.alphas[t]
+
+        Q_bar_s_E = self.transition.get_Q_bar_E(alpha_bar_s)
+        # Note that computing Q_bar_t from alpha_bar_t is the same
+        # as computing Q_t from alpha_t.
+        Q_t_E = self.transition.get_Q_bar_E(alpha_t)
+
+        pred_E = logit_E.softmax(dim=-1)
+
+        return self.denoise_match_Z(E_t_one_hot,
+                                    Q_t_E,
+                                    E_one_hot,
+                                    Q_bar_s_E,
+                                    pred_E)
+
+    @torch.no_grad()
+    def val_step(self,
+                 X_one_hot_3d,
+                 E_one_hot,
+                 Y,
+                 X_one_hot_2d,
+                 batch_src,
+                 batch_dst,
+                 batch_E_one_hot):
+        """Perform a validation step.
+
+        Parameters
+        ----------
+        X_one_hot_3d : torch.Tensor of shape (F, |V|, 2)
+            X_one_hot_3d[f, :, :] is the one-hot encoding of the f-th node attribute
+            in the real graph.
+        E_one_hot : torch.Tensor of shape (|V|, |V|, 2)
+            - E_one_hot[:, :, 0] indicates the absence of an edge in the real graph.
+            - E_one_hot[:, :, 1] is the adjacency matrix of the real graph.
+        Y : torch.Tensor of shape (|V|)
+            Categorical node labels of the real graph.
+        X_one_hot_2d : torch.Tensor of shape (|V|, 2 * F)
+            Flattened one-hot encoding of the node attributes in the real graph.
+        batch_src : torch.LongTensor of shape (B)
+            Source node IDs for a batch of candidate edges (node pairs).
+        batch_dst : torch.LongTensor of shape (B)
+            Destination node IDs for a batch of candidate edges (node pairs).
+        batch_E_one_hot : torch.Tensor of shape (B, 2)
+            E_one_hot[batch_dst, batch_src].
+
+        Returns
+        -------
+        denoise_match_E : float
+            Denoising matching term for edge.
+        denoise_match_X : float
+            Denoising matching term for node attributes.
+        log_p_0_E : float
+            Reconstruction term for edge.
+        log_p_0_X : float
+            Reconstruction term for node attributes.
+        """
+        device = E_one_hot.device
+
+        # Case1: X
+        denoise_match_X = []
+        # t=0 is handled separately.
+        for t_sample_X in range(1, self.T_X + 1):
+            t_X = torch.LongTensor([t_sample_X]).to(device)
+            t_float_X, X_t_one_hot = self.apply_noise_X(X_one_hot_3d, t_X)
+            logit_X = self.graph_encoder.pred_X(t_float_X,
+                                                X_t_one_hot,
+                                                Y)
+
+            denoise_match_X_t = self.denoise_match_X(t_float_X,
+                                                     logit_X,
+                                                     X_t_one_hot,
+                                                     X_one_hot_3d)
+            denoise_match_X.append(denoise_match_X_t)
+        denoise_match_X = float(np.mean(denoise_match_X)) * self.T_X
+
+        # Case2: E
+        denoise_match_E = []
+        # t=0 is handled separately.
+        for t_sample_E in range(1, self.T_E + 1):
+            t_E = torch.LongTensor([t_sample_E]).to(device)
+            t_float_E, E_t = self.apply_noise_E(E_one_hot, t_E)
+            A_t = self.get_adj(E_t)
+            logit_E = self.graph_encoder.pred_E(t_float_E,
+                                                X_one_hot_2d,
+                                                Y,
+                                                A_t,
+                                                batch_src,
+                                                batch_dst)
+
+            E_t_one_hot = F.one_hot(E_t[batch_src, batch_dst],
+                                    num_classes=self.num_classes_E).float()
+            denoise_match_E_t = self.denoise_match_E(t_float_E,
+                                                     logit_E,
+                                                     E_t_one_hot,
+                                                     batch_E_one_hot)
+            denoise_match_E.append(denoise_match_E_t)
+        denoise_match_E = float(np.mean(denoise_match_E)) * self.T_E
+
+        # t=0
+        t_0 = torch.LongTensor([0]).to(device)
+        loss_X, loss_E = self.log_p_t(X_one_hot_3d,
+                                      E_one_hot,
+                                      Y,
+                                      X_one_hot_2d,
+                                      batch_src,
+                                      batch_dst,
+                                      batch_E_one_hot,
+                                      t_X=t_0,
+                                      t_E=t_0)
+        log_p_0_E = loss_E.item()
+        log_p_0_X = loss_X.item()
+
+        return denoise_match_E, denoise_match_X,\
+            log_p_0_E, log_p_0_X
