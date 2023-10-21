@@ -565,8 +565,8 @@ class ModelSync(BaseModel):
             X_one_hot_3d[f, :, :] is the one-hot encoding of the f-th node attribute
             in the real graph.
         E_one_hot : torch.Tensor of shape (|V|, |V|, 2)
-            - E_one_hot[:, :, 0] indicates the absence of an edge.
-            - E_one_hot[:, :, 1] is the original adjacency matrix.
+            - E_one_hot[:, :, 0] indicates the absence of an edge in the real graph.
+            - E_one_hot[:, :, 1] is the adjacency matrix of the real graph.
         t : torch.LongTensor of shape (1), optional
             If specified, a time step will be enforced rather than sampled.
 
@@ -988,6 +988,41 @@ class ModelAsync(BaseModel):
 
         return t_float_X, X_t_one_hot
 
+    def apply_noise_E(self, E_one_hot, t=None):
+        """Corrupt A and sample A^t.
+
+        Parameters
+        ----------
+        E_one_hot : torch.Tensor of shape (|V|, |V|, 2)
+            - E_one_hot[:, :, 0] indicates the absence of an edge in the real graph.
+            - E_one_hot[:, :, 1] is the adjacency matrix of the real graph.
+        t : torch.LongTensor of shape (1), optional
+            If specified, a time step will be enforced rather than sampled.
+
+        Returns
+        -------
+        t_float_E : torch.Tensor of shape (1)
+            Sampled timestep divided by self.T_E.
+        E_t : torch.LongTensor of shape (|V|, |V|)
+            Sampled symmetric adjacency matrix.
+        """
+        if t is None:
+            # Sample a timestep t uniformly.
+            # Note that the notation is slightly inconsistent with the paper.
+            # t=0 corresponds to t=1 in the paper, where corruption has already taken place.
+            t = torch.randint(low=0, high=self.T_E + 1, size=(1,),
+                              device=E_one_hot.device)
+
+        alpha_bar_t = self.noise_schedule_E.alpha_bars[t]
+
+        Q_bar_t_E = self.transition.get_Q_bar_E(alpha_bar_t) # (2, 2)
+        prob_E = E_one_hot @ Q_bar_t_E                       # (|V|, |V|, 2)
+        E_t = self.sample_E(prob_E)
+
+        t_float_E = t / self.T_E
+
+        return t_float_E, E_t
+
     def log_p_t(self,
                 X_one_hot_3d,
                 E_one_hot,
@@ -1033,3 +1068,5 @@ class ModelAsync(BaseModel):
             Scalar representing the loss for edge existence.
         """
         t_float_X, X_t_one_hot = self.apply_noise_X(X_one_hot_3d, t_X)
+        t_float_E, E_t = self.apply_noise_E(E_one_hot, t_E)
+        A_t = self.get_adj(E_t)
