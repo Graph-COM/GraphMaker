@@ -48,6 +48,20 @@ def main(args):
         model.graph_encoder.pred_X.load_state_dict(state_dict["pred_X_state_dict"])
         model.graph_encoder.pred_E.load_state_dict(state_dict["pred_E_state_dict"])
 
+    elif model_name == "Async":
+        from model import ModelAsync
+
+        model = ModelAsync(X_marginal=X_marginal,
+                           Y_marginal=Y_marginal,
+                           E_marginal=E_marginal,
+                           mlp_X_config=train_yaml_data["mlp_X"],
+                           gnn_E_config=train_yaml_data["gnn_E"],
+                           num_nodes=num_nodes,
+                           **train_yaml_data["diffusion"]).to(device)
+
+        model.graph_encoder.pred_X.load_state_dict(state_dict["pred_X_state_dict"])
+        model.graph_encoder.pred_E.load_state_dict(state_dict["pred_E_state_dict"])
+
     model.eval()
 
     # Set seed for better reproducibility.

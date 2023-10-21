@@ -46,6 +46,7 @@ python train_sync.py -d D
 
 # The GraphMaker-Async variant first generates node attributes, and then generates graph structure.
 python train_async.py -d D
+# The trained model checkpoint will be saved to {D}_cpts/Async_XXX.pth
 ```
 
 `D` can be one of the four built-in datasets, including `cora`, `citeseer`, `amazon_photo`, `amazon_computer`.

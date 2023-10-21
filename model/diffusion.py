@@ -826,7 +826,7 @@ class ModelSync(BaseModel):
         data_loader = DataLoader(edge_index, batch_size=batch_size,
                                  num_workers=num_workers)
 
-        # Sample G_T from prior distribution.
+        # Sample G^T from prior distribution.
         # (|V|, C)
         Y_prior = self.Y_marginal[None, :].expand(self.num_nodes, -1)
         # (|V|)
@@ -1291,3 +1291,120 @@ class ModelAsync(BaseModel):
 
         return denoise_match_E, denoise_match_X,\
             log_p_0_E, log_p_0_X
+
+    @torch.no_grad()
+    def sample(self, batch_size=32768, num_workers=4):
+        """Sample a graph.
+
+        Parameters
+        ----------
+        batch_size : int
+            Batch size for edge prediction.
+        num_workers : int
+            Number of subprocesses for data loading in edge prediction.
+
+        Returns
+        -------
+        X_t_one_hot : torch.Tensor of shape (F, |V|, 2)
+            One-hot encoding of the generated node attributes.
+        Y_0_one_hot : torch.Tensor of shape (|V|, C)
+            One-hot encoding of the generated node labels.
+        E_t : torch.LongTensor of shape (|V|, |V|)
+            Adjacency matrix of the generated graph.
+        """
+        device = self.X_marginal.device
+
+        # Sample Y_0
+        # (|V|, C)
+        Y_prior = self.Y_marginal[None, :].expand(self.num_nodes, -1)
+        # (|V|)
+        Y_0 = Y_prior.multinomial(1).reshape(-1)
+
+        # Sample X^T from prior distribution.
+        # (F, |V|, 2)
+        X_prior = self.X_marginal[:, None, :].expand(-1, self.num_nodes, -1)
+        # (|V|, 2F)
+        X_t_one_hot = self.sample_X(X_prior)
+
+        # Iteratively sample p(X^s | X^t) for t = 1, ..., T_X, with s = t - 1.
+        for s_X in tqdm(list(reversed(range(0, self.T_X)))):
+            t_X = s_X + 1
+            t_float_X = torch.tensor([t_X / self.T_X]).to(device)
+            pred_X = self.graph_encoder.pred_X(t_float_X,
+                                               X_t_one_hot,
+                                               Y_0)
+            pred_X = pred_X.softmax(dim=-1)
+            # (F, |V|, 2)
+            pred_X = torch.transpose(pred_X, 0, 1)
+
+            # (|V|, F, 2)
+            X_t_one_hot = X_t_one_hot.reshape(self.num_nodes, self.num_attrs_X, -1)
+            # (F, |V|, 2)
+            X_t_one_hot = torch.transpose(X_t_one_hot, 0, 1)
+
+            # Note that computing Q_bar_t from alpha_bar_t is the same
+            # as computing Q_t from alpha_t.
+            alpha_t_X = self.noise_schedule_X.alphas[t_X]
+            alpha_bar_s_X = self.noise_schedule_X.alpha_bars[s_X]
+            alpha_bar_t_X = self.noise_schedule_X.alpha_bars[t_X]
+
+            # (F, |V|, 2)
+            Q_t_X = self.transition.get_Q_bar_X(alpha_t_X)
+            Q_bar_s_X = self.transition.get_Q_bar_X(alpha_bar_s_X)
+            Q_bar_t_X = self.transition.get_Q_bar_X(alpha_bar_t_X)
+
+            X_prob = self.posterior(X_t_one_hot, Q_t_X,
+                                    Q_bar_s_X, Q_bar_t_X, pred_X)
+            X_t_one_hot = self.sample_X(X_prob)
+
+        # Sample E^T from prior distribution.
+        # (|V|, |V|, 2)
+        E_prior = self.E_marginal[None, None, :].expand(
+            self.num_nodes, self.num_nodes, -1)
+        # (|V|, |V|)
+        E_t = self.sample_E(E_prior)
+
+        dst, src = torch.triu_indices(self.num_nodes, self.num_nodes,
+                                      offset=1, device=device)
+        # (|E|)
+        self.dst = dst
+        # (|E|)
+        self.src = src
+        # (|E|, 2)
+        edge_index = torch.stack([dst, src], dim=1).to("cpu")
+        data_loader = DataLoader(edge_index, batch_size=batch_size,
+                                 num_workers=num_workers)
+
+        # Iteratively sample p(A^s | A^t) for t = 1, ..., T_E, with s = t - 1.
+        for s_E in tqdm(list(reversed(range(0, self.T_E)))):
+            t_E = s_E + 1
+            alpha_t_E = self.noise_schedule_E.alphas[t_E]
+            alpha_bar_s_E = self.noise_schedule_E.alpha_bars[s_E]
+            alpha_bar_t_E = self.noise_schedule_E.alpha_bars[t_E]
+
+            Q_t_E = self.transition.get_Q_bar_E(alpha_t_E)
+            Q_bar_s_E = self.transition.get_Q_bar_E(alpha_bar_s_E)
+            Q_bar_t_E = self.transition.get_Q_bar_E(alpha_bar_t_E)
+
+            t_float_E = torch.tensor([t_E / self.T_E]).to(device)
+
+            _, E_t = self.get_E_t(device,
+                                  data_loader,
+                                  self.graph_encoder.pred_E,
+                                  t_float_E,
+                                  X_t_one_hot,
+                                  Y_0,
+                                  E_t,
+                                  Q_t_E,
+                                  Q_bar_s_E,
+                                  Q_bar_t_E,
+                                  batch_size)
+
+        # (|V|, F, 2)
+        X_t_one_hot = X_t_one_hot.reshape(self.num_nodes, self.num_attrs_X, -1)
+        # (F, |V|, 2)
+        X_t_one_hot = torch.transpose(X_t_one_hot, 0, 1)
+
+        Y_0_one_hot = F.one_hot(Y_0, num_classes=self.num_classes_Y).float()
+
+        return X_t_one_hot, Y_0_one_hot, E_t
