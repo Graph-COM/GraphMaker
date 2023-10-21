@@ -897,6 +897,22 @@ class ModelAsync(BaseModel):
     """
     Parameters
     ----------
+    T_X : int
+        Number of diffusion time steps - 1 for node attributes.
+    T_E : int
+        Number of diffusion time steps - 1 for edges.
+    X_marginal : torch.Tensor of shape (F, 2)
+        X_marginal[f, :] is the marginal distribution of the f-th node attribute.
+    Y_marginal : torch.Tensor of shape (C)
+        Marginal distribution of the node labels.
+    E_marginal : torch.Tensor of shape (2)
+        Marginal distribution of the edge existence.
+    mlp_X_config : dict
+        Configuration of the MLP for reconstructing node attributes.
+    gnn_E_config : dict
+        Configuration of the GNN for reconstructing edges.
+    num_nodes : int
+        Number of nodes in the original graph.
     """
     def __init__(self,
                  T_X,
@@ -912,3 +928,13 @@ class ModelAsync(BaseModel):
                          Y_marginal=Y_marginal,
                          E_marginal=E_marginal,
                          num_nodes=num_nodes)
+
+        del self.T
+        del self.noise_schedule
+
+        self.T_X = T_X
+        self.T_E = T_E
+
+        device = X_marginal.device
+        self.noise_schedule_X = NoiseSchedule(T_X, device)
+        self.noise_schedule_E = NoiseSchedule(T_E, device)
