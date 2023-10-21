@@ -2,8 +2,6 @@
 
 [[Paper]](./GraphMaker_arXiv.pdf)
 
-**The implementation for GraphMaker-Sync is finished. The implementation for GraphMaker-Async is still under construction.**
-
 ![model](model.png)
 
 ## Table of Contents
