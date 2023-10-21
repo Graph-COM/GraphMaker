@@ -333,6 +333,66 @@ class GNN(nn.Module):
 
         return logit_X, logit_E
 
+class MLPLayer(nn.Module):
+    """
+    Parameters
+    ----------
+    hidden_X : int
+        Hidden size for the node attributes.
+    hidden_Y : int
+        Hidden size for the node labels.
+    hidden_t : int
+        Hidden size for the normalized time step.
+    dropout : float
+        Dropout rate.
+    """
+    def __init__(self,
+                 hidden_X,
+                 hidden_Y,
+                 hidden_t,
+                 dropout):
+        super().__init__()
+
+        self.update_X = nn.Sequential(
+            nn.Linear(hidden_X + hidden_Y + hidden_t, hidden_X),
+            nn.ReLU(),
+            nn.LayerNorm(hidden_X),
+            nn.Dropout(dropout)
+        )
+        self.update_Y = nn.Sequential(
+            nn.Linear(hidden_Y, hidden_Y),
+            nn.ReLU(),
+            nn.LayerNorm(hidden_Y),
+            nn.Dropout(dropout)
+        )
+
+    def forward(self, h_X, h_Y, h_t):
+        """
+        Parameters
+        ----------
+        h_X : torch.Tensor of shape (|V|, hidden_X)
+            Hidden representations for the node attributes.
+        h_Y : torch.Tensor of shape (|V|, hidden_Y)
+            Hidden representations for the node labels.
+        h_t : torch.Tensor of shape (1, hidden_t)
+            Hidden representations for the normalized time step.
+
+        Returns
+        -------
+        h_X : torch.Tensor of shape (|V|, hidden_X)
+            Updated hidden representations for the node attributes.
+        h_Y : torch.Tensor of shape (|V|, hidden_Y)
+            Updated hidden representations for the node labels.
+        """
+        num_nodes = h_X.size(0)
+        h_t_expand = h_t.expand(num_nodes, -1)
+        h_X = torch.cat([h_X, h_Y, h_t_expand], dim=1)
+
+        h_X = self.update_X(h_X)
+        h_Y = self.update_Y(h_Y)
+
+        return h_X, h_Y
+
 class GNNAsymm(nn.Module):
     """P(X|Y, X_t) + P(A|Y, X, A_t)
 
