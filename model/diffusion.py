@@ -562,7 +562,8 @@ class ModelSync(BaseModel):
         Parameters
         ----------
         X_one_hot_3d : torch.Tensor of shape (F, |V|, 2)
-            X_one_hot_3d[f, :, :] is the one-hot encoding of the f-th node attribute.
+            X_one_hot_3d[f, :, :] is the one-hot encoding of the f-th node attribute
+            in the real graph.
         E_one_hot : torch.Tensor of shape (|V|, |V|, 2)
             - E_one_hot[:, :, 0] indicates the absence of an edge.
             - E_one_hot[:, :, 1] is the original adjacency matrix.
@@ -949,6 +950,44 @@ class ModelAsync(BaseModel):
 
         self.loss_X = LossX(self.num_attrs_X, self.num_classes_X)
 
+    def apply_noise_X(self, X_one_hot_3d, t=None):
+        """Corrupt X and sample X^t.
+
+        Parameters
+        ----------
+        X_one_hot_3d : torch.Tensor of shape (F, |V|, 2)
+            X_one_hot_3d[f, :, :] is the one-hot encoding of the f-th node attribute
+            in the real graph.
+        t : torch.LongTensor of shape (1), optional
+            If specified, a time step will be enforced rather than sampled.
+
+        Returns
+        -------
+        t_float_X : torch.Tensor of shape (1)
+            Sampled timestep divided by self.T_X.
+        X_t_one_hot : torch.Tensor of shape (|V|, 2 * F)
+            One-hot encoding of the sampled node attributes.
+        """
+        if t is None:
+            # Sample a timestep t uniformly.
+            # Note that the notation is slightly inconsistent with the paper.
+            # t=0 corresponds to t=1 in the paper, where corruption has already taken place.
+            t = torch.randint(low=0, high=self.T_X + 1, size=(1,),
+                              device=X_one_hot_3d.device)
+
+        alpha_bar_t = self.noise_schedule_X.alpha_bars[t]
+
+        Q_bar_t_X = self.transition.get_Q_bar_X(alpha_bar_t) # (F, 2, 2)
+        # Compute matrix multiplication over the first batch dimension.
+        prob_X = torch.bmm(X_one_hot_3d, Q_bar_t_X)          # (F, |V|, 2)
+
+        # Sample X_t.
+        X_t_one_hot = self.sample_X(prob_X)
+
+        t_float_X = t / self.T_X
+
+        return t_float_X, X_t_one_hot
+
     def log_p_t(self,
                 X_one_hot_3d,
                 E_one_hot,
@@ -993,3 +1032,4 @@ class ModelAsync(BaseModel):
         loss_E : torch.Tensor
             Scalar representing the loss for edge existence.
         """
+        t_float_X, X_t_one_hot = self.apply_noise_X(X_one_hot_3d, t_X)
