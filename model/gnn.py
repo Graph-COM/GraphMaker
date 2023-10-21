@@ -393,6 +393,75 @@ class MLPLayer(nn.Module):
 
         return h_X, h_Y
 
+class MLPTower(nn.Module):
+    def __init__(self,
+                 num_attrs_X,
+                 num_classes_X,
+                 num_classes_Y,
+                 hidden_t,
+                 hidden_X,
+                 hidden_Y,
+                 num_mlp_layers,
+                 dropout):
+        super().__init__()
+
+        in_X = num_attrs_X * num_classes_X
+        self.num_attrs_X = num_attrs_X
+        self.num_classes_X = num_classes_X
+
+        self.mlp_in_t = nn.Sequential(
+            nn.Linear(1, hidden_t),
+            nn.ReLU(),
+            nn.Linear(hidden_t, hidden_t),
+            nn.ReLU())
+        self.mlp_in_X = nn.Sequential(
+            nn.Linear(in_X, hidden_X),
+            nn.ReLU(),
+            nn.Linear(hidden_X, hidden_X),
+            nn.ReLU()
+        )
+        self.emb_Y = nn.Embedding(num_classes_Y, hidden_Y)
+
+        self.mlp_layers = nn.ModuleList([
+            MLPLayer(hidden_X,
+                     hidden_Y,
+                     hidden_t,
+                     dropout)
+            for _ in range(num_mlp_layers)])
+
+        # +1 for the input features
+        hidden_cat = (num_mlp_layers + 1) * (hidden_X + hidden_Y) + hidden_t
+        self.mlp_out = nn.Sequential(
+            nn.Linear(hidden_cat, hidden_cat),
+            nn.ReLU(),
+            nn.Linear(hidden_cat, in_X)
+        )
+
+    def forward(self,
+                t_float,
+                X_t_one_hot,
+                Y_real):
+        # Input projection.
+        h_t = self.mlp_in_t(t_float).unsqueeze(0)
+        h_X = self.mlp_in_X(X_t_one_hot)
+        h_Y = self.emb_Y(Y_real)
+
+        h_X_list = [h_X]
+        h_Y_list = [h_Y]
+        for mlp in self.mlp_layers:
+            h_X, h_Y = mlp(h_X, h_Y, h_t)
+            h_X_list.append(h_X)
+            h_Y_list.append(h_Y)
+
+        h_t = h_t.expand(h_X.size(0), -1)
+        h_cat = torch.cat(h_X_list + h_Y_list + [h_t], dim=1)
+
+        logit = self.mlp_out(h_cat)
+        # (|V|, F, C)
+        logit = logit.reshape(Y_real.size(0), self.num_attrs_X, -1)
+
+        return logit
+
 class GNNAsymm(nn.Module):
     """P(X|Y, X_t) + P(A|Y, X, A_t)
 
@@ -419,3 +488,14 @@ class GNNAsymm(nn.Module):
                  mlp_X_config,
                  gnn_E_config):
         super().__init__()
+
+        self.pred_X = MLPTower(num_attrs_X,
+                               num_classes_X,
+                               num_classes_Y,
+                               **mlp_X_config)
+
+        self.pred_E = LinkPredictor(num_attrs_X,
+                                    num_classes_X,
+                                    num_classes_Y,
+                                    num_classes_E,
+                                    **gnn_E_config)
