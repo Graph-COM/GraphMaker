@@ -26,7 +26,7 @@ pip install dgl==1.1.0+cu116 -f https://data.dgl.ai/wheels/cu116/repo.html
 pip install pandas scikit-learn pydantic wandb
 ```
 
-You also need to compile `orca.cpp`.
+You also need to compile `orca.cpp` (https://file.biolab.si/biolab/supp/orca/orca.html).
 
 ```bash
 cd orca
