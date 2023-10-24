@@ -1,6 +1,6 @@
 # GraphMaker
 
-[[Paper]](./GraphMaker_arXiv.pdf)
+[[Paper]](https://arxiv.org/abs/2310.13833)
 
 ![model](model.png)
 
@@ -14,6 +14,7 @@
   * [Q1: libcusparse.so](#q1-libcusparseso)
   * [Q2: Wandb](#q2-wandb)
   * [Q3: Other Requests](#q3-other-requests)
+- [Citation](#citation)
 
 ## Installation
 
@@ -87,3 +88,14 @@ export LD_LIBRARY_PATH=home/miniconda3/envs/GraphMaker/lib:$LD_LIBRARY_PATH
 
 - It's generally recommended to open a GitHub issue. This allows us to track the progress, and the discussion might help others who have the same question.
 - Otherwise, you can also send an email to `mufeili1996@gmail.com`.
+
+## Citation
+
+```tex
+@article{li2023graphmaker,
+    title={GraphMaker: Can Diffusion Models Generate Large Attributed Graphs?},
+    author={Mufei Li and Eleonora Kreačić and Vamsi K. Potluru and Pan Li},
+    year={2023},
+    journal={arXiv preprint arXiv:2310.13833}
+}
+```
