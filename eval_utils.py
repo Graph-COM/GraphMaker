@@ -472,53 +472,6 @@ class Evaluator:
 
         return dgl_g
 
-    def add_mask_citeseer(self, dgl_g, Y_one_hot):
-        num_nodes = dgl_g.num_nodes()
-        train_mask = torch.zeros(num_nodes)
-        val_mask = torch.zeros(num_nodes)
-        test_mask = torch.zeros(num_nodes)
-
-        # Based on the raw graph
-        num_val_nodes = {
-            0: 29,
-            1: 86,
-            2: 116,
-            3: 106,
-            4: 94,
-            5: 69
-        }
-
-        num_test_nodes = {
-            0: 77,
-            1: 182,
-            2: 181,
-            3: 231,
-            4: 169,
-            5: 160
-        }
-
-        num_classes = Y_one_hot.size(-1)
-        for y in range(num_classes):
-            nodes_y = (Y_one_hot[:, y] == 1.).nonzero().squeeze(-1)
-            nid_y = torch.randperm(len(nodes_y))
-            nodes_y = nodes_y[nid_y]
-
-            train_mask[nodes_y[:20]] = 1.
-
-            start = 20
-            end = start + num_val_nodes[y]
-            val_mask[nodes_y[start: end]] = 1.
-
-            start = end
-            end = start + num_test_nodes[y]
-            test_mask[nodes_y[start: end]] = 1.
-
-        dgl_g.ndata["train_mask"] = train_mask.bool()
-        dgl_g.ndata["val_mask"] = val_mask.bool()
-        dgl_g.ndata["test_mask"] = test_mask.bool()
-
-        return dgl_g
-
     def add_mask_benchmark(self, dgl_g, Y_one_hot):
         num_nodes = dgl_g.num_nodes()
         train_mask = torch.zeros(num_nodes)
@@ -545,8 +498,6 @@ class Evaluator:
     def add_mask(self, dgl_g, Y_one_hot):
         if self.data_name == "cora":
             return self.add_mask_cora(dgl_g, Y_one_hot)
-        elif self.data_name == "citeseer":
-            return self.add_mask_citeseer(dgl_g, Y_one_hot)
         elif self.data_name in ["amazon_photo", "amazon_computer"]:
             return self.add_mask_benchmark(dgl_g, Y_one_hot)
         else:

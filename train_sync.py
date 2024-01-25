@@ -226,7 +226,7 @@ if __name__ == '__main__':
 
     parser = ArgumentParser()
     parser.add_argument("-d", "--dataset", type=str, required=True,
-                        choices=["cora", "citeseer", "amazon_photo", "amazon_computer"])
+                        choices=["cora", "amazon_photo", "amazon_computer"])
     args = parser.parse_args()
 
     main(args)
