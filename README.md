@@ -48,7 +48,7 @@ python train_async.py -d D
 # The trained model checkpoint will be saved to {D}_cpts/Async_XXX.pth
 ```
 
-`D` can be one of the four built-in datasets, including `cora`, `amazon_photo`, `amazon_computer`.
+`D` can be one of the three built-in datasets, including `cora`, `amazon_photo`, `amazon_computer`.
 
 ### Sample
 
