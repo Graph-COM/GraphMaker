@@ -2,7 +2,7 @@
 
 [[Paper]](https://arxiv.org/abs/2310.13833)
 
-![model](model.png)
+![model](model_240125.png)
 
 ## Table of Contents
 
