@@ -95,7 +95,7 @@ export LD_LIBRARY_PATH=home/miniconda3/envs/GraphMaker/lib:$LD_LIBRARY_PATH
 @article{li2023graphmaker,
     title={GraphMaker: Can Diffusion Models Generate Large Attributed Graphs?},
     author={Mufei Li and Eleonora Kreačić and Vamsi K. Potluru and Pan Li},
-    year={2023},
-    journal={arXiv preprint arXiv:2310.13833}
+    journal={Transactions on Machine Learning Research},
+    year={2024}
 }
 ```
