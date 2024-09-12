@@ -92,7 +92,7 @@ export LD_LIBRARY_PATH=home/miniconda3/envs/GraphMaker/lib:$LD_LIBRARY_PATH
 ## Citation
 
 ```tex
-@article{li2023graphmaker,
+@article{li2024graphmaker,
     title={GraphMaker: Can Diffusion Models Generate Large Attributed Graphs?},
     author={Mufei Li and Eleonora Kreačić and Vamsi K. Potluru and Pan Li},
     journal={Transactions on Machine Learning Research},
