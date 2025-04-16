@@ -134,11 +134,12 @@ class CNEvaluator:
         )
 
     def summary(self):
-        print(f"ACC(G|G): {self.real_real_acc}")
         mean_sample_real_acc = np.mean(self.sample_real_acc)
-        print(f"ACC(G|G_hat): {mean_sample_real_acc}")
-
-        mean_sample_sample_acc = np.mean(self.sample_sample_acc)
-        print(f"ACC(G_hat|G_hat): {mean_sample_sample_acc}")
-        mean_real_sample_acc = np.mean(self.real_sample_acc)
-        print(f"ACC(G_hat|G): {mean_real_sample_acc}")
+        print(f"ACC(G|G_hat) / ACC(G|G): {mean_sample_real_acc / self.real_real_acc}")
+                
+        # print(f"ACC/AUC(G|G): {self.real_real_acc}")
+        # print(f"ACC/AUC(G|G_hat): {mean_sample_real_acc}")
+        # mean_sample_sample_acc = np.mean(self.sample_sample_acc)
+        # print(f"ACC/AUC(G_hat|G_hat): {mean_sample_sample_acc}")
+        # mean_real_sample_acc = np.mean(self.real_sample_acc)
+        # print(f"ACC/AUC(G_hat|G): {mean_real_sample_acc}")
