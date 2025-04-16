@@ -178,7 +178,7 @@ def main(args):
                 "best_epoch_E": best_epoch_E,
                 "pred_X_state_dict": best_state_dict_X,
                 "pred_E_state_dict": best_state_dict_E
-            }, f"{model_cpt_dir}/{model_name}_T{T}_epoch_{epoch}.pth")
+            }, f"{model_cpt_dir}/{model_name}_T{T}.pth")
             print('model saved')
 
         if log_p_0_X < best_log_p_0_X:
