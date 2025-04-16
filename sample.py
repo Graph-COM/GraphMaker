@@ -2,11 +2,27 @@ import dgl
 import torch
 import torch.nn.functional as F
 
+from huggingface_hub import hf_hub_download
+
 from data import load_dataset, preprocess
 from eval_utils import Evaluator
 from setup_utils import set_seed
 
 def main(args):
+    if args.model_path is None:
+        if args.dataset is None or args.type is None:
+            raise ValueError("If model_path is not provided, both dataset and type must be specified for downloading a pre-trained model checkpoint.")
+        
+        filename = f"{args.dataset}_{args.type}.pth"
+        
+        print(f"Downloading pre-trained model: {filename}")
+        args.model_path = hf_hub_download(repo_id="Graph-COM/GraphMaker", 
+                                          filename=filename,
+                                          cache_dir="./downloaded_cpts")
+        print(f"Downloaded model to {args.model_path}")
+    else:
+        print(f"Loading local model from {args.model_path}")
+    
     state_dict = torch.load(args.model_path)
     dataset = state_dict["dataset"]
 
@@ -83,6 +99,10 @@ if __name__ == '__main__':
 
     parser = ArgumentParser()
     parser.add_argument("--model_path", type=str, help="Path to the model.")
+    parser.add_argument("--dataset", type=str, choices=["cora", "amazon_photo", "amazon_computer"],
+                        help="Dataset name. Only specify it if you want to use a pre-trained model.")
+    parser.add_argument("--type", type=str, choices=["sync", "async"],
+                        help="Model type. Only specify it if you want to use a pre-trained model.")
     parser.add_argument("--num_samples", type=int, default=10,
                         help="Number of samples to generate.")
     args = parser.parse_args()
