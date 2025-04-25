@@ -10,6 +10,7 @@
 - [Usage](#usage)
   * [Train](#train)
   * [Sample](#sample)
+  * [Sample with Pre-Trained Models](#sample-with-pre-trained-models)
 - [Frequently Asked Questions](#frequently-asked-questions)
   * [Q1: libcusparse.so](#q1-libcusparseso)
   * [Q2: Wandb](#q2-wandb)
@@ -24,7 +25,7 @@ conda activate GraphMaker
 pip install torch==1.12.0+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
 conda install -c conda-forge cudatoolkit=11.6
 pip install dgl==1.1.0+cu116 -f https://data.dgl.ai/wheels/cu116/repo.html
-pip install pandas scikit-learn pydantic wandb
+pip install pandas scikit-learn pydantic wandb huggingface_hub==0.30.2
 ```
 
 You also need to compile `orca.cpp` (https://file.biolab.si/biolab/supp/orca/orca.html).
@@ -57,6 +58,17 @@ python sample.py --model_path P
 ```
 
 `P` is the path to a model checkpoint saved in the training stage.
+
+### Sample with Pre-Trained Models
+
+Alternatively, you can also use our pre-trained model checkpoints for sampling.
+
+```bash
+python sample.py --dataset D --type T
+```
+
+- `D` can be one of the three built-in datasets, including `cora`, `amazon_photo`, `amazon_computer`.
+- `T` can be `sync` or `async`.
 
 ## Frequently Asked Questions
 

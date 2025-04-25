@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -204,3 +205,7 @@ class GAETrainer(BaseTrainer):
         model.load_state_dict(state_dict["model_state_dict"])
         self.model = model
         self.num_classes = state_dict["num_classes"]
+
+    def summary(self):
+        mean_sample_real_acc = np.mean(self.sample_real_acc)
+        print(f"AUC(G|G_hat) / AUC(G|G): {mean_sample_real_acc / self.real_real_acc}")
